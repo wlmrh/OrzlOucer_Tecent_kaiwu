@@ -13,7 +13,7 @@ import numpy as np
 from torch import nn
 import torch.nn.functional as F
 from typing import List
-from agent_target_dqn.conf.conf import Config
+from agent_dqn.conf.conf import Config
 
 import sys
 import os
@@ -84,4 +84,3 @@ class MLP(nn.Module):
 
     def forward(self, data):
         return self.fc_layers(data)
-

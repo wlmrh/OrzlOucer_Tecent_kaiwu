@@ -7,130 +7,95 @@
 Author: Tencent AI Arena Authors
 """
 
-import os
-import sys
-from typing import List, Optional
 
 import torch
-import torch.nn as nn
+import numpy as np
+from torch import nn
 import torch.nn.functional as F
-
+from typing import List
 from agent_target_dqn.conf.conf import Config
 
-# Adjust thread settings based on entry point
+import sys
+import os
+
 if os.path.basename(sys.argv[0]) == "learner.py":
+    import torch
+
     torch.set_num_interop_threads(2)
     torch.set_num_threads(2)
 else:
+    import torch
+
     torch.set_num_interop_threads(4)
     torch.set_num_threads(4)
 
 
-def make_fc_layer(in_features: int, out_features: int) -> nn.Linear:
-    """
-    Create and initialize a linear layer with orthogonal weights and zero bias.
-    """
-    fc = nn.Linear(in_features, out_features)
-    nn.init.orthogonal_(fc.weight)
-    nn.init.zeros_(fc.bias)
-    return fc
-
-
-class ResidualBlock(nn.Module):
-    """
-    A simple residual block for MLP with two linear layers.
-    """
-    def __init__(self, dim: int):
-        super(ResidualBlock, self).__init__()
-        self.fc1 = make_fc_layer(dim, dim)
-        self.fc2 = make_fc_layer(dim, dim)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        identity = x
-        out = F.relu(self.fc1(x))
-        out = self.fc2(out)
-        return F.relu(out + identity)
-
-
 class Model(nn.Module):
-    """
-    DQN-based Q-network with optional Dueling architecture and Residual MLP.
+    def __init__(self, state_shape, action_shape=0, softmax=False):
+        super().__init__()
+        # feature configure parameter
+        # 特征配置参数
+        self.feature_len = Config.DIM_OF_OBSERVATION
 
-    Args:
-        state_dim (int): Length of the input feature vector.
-        action_shape (int): Number of discrete actions.
-        dueling (bool): Whether to use Dueling DQN.
-        num_res_blocks (int): Number of residual blocks in MLP.
-        device (Optional[torch.device]): Device for computation.
-    """
+        # Q network
+        # Q 网络
+        self.q_mlp = MLP([self.feature_len, 256, 128, action_shape], "q_mlp")
+
+    # Forward inference
+    # 前向推理
+    def forward(self, feature):
+        # Action and value processing
+        logits = self.q_mlp(feature)
+        return logits
+
+
+def make_fc_layer(in_features: int, out_features: int):
+    # Wrapper function to create and initialize a linear layer
+    # 创建并初始化一个线性层
+    fc_layer = nn.Linear(in_features, out_features)
+
+    # initialize weight and bias
+    # 初始化权重及偏移量
+    nn.init.orthogonal(fc_layer.weight)
+    nn.init.zeros_(fc_layer.bias)
+
+    return fc_layer
+
+
+class MLP(nn.Module):
     def __init__(
         self,
-        state_dim: int,
-        action_shape: int,
-        dueling: bool = False,
-        num_res_blocks: int = 2,
-        device: Optional[torch.device] = None,
+        fc_feat_dim_list: List[int],
+        name: str,
+        non_linearity: nn.Module = nn.ReLU,
+        non_linearity_last: bool = False,
     ):
-        super(Model, self).__init__()
-        self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.dueling = dueling
-        self.state_dim = state_dim
-        self.action_shape = action_shape
-        self.num_res_blocks = num_res_blocks
+        # Create a MLP object
+        # 创建一个 MLP 对象
+        super().__init__()
+        self.fc_layers = nn.Sequential()
+        for i in range(len(fc_feat_dim_list) - 1):
+            fc_layer = make_fc_layer(fc_feat_dim_list[i], fc_feat_dim_list[i + 1])
+            self.fc_layers.add_module("{0}_fc{1}".format(name, i + 1), fc_layer)
+            # no relu for the last fc layer of the mlp unless required
+            # 除非有需要，否则 mlp 的最后一个 fc 层不使用 relu
+            if i + 1 < len(fc_feat_dim_list) - 1 or non_linearity_last:
+                self.fc_layers.add_module("{0}_non_linear{1}".format(name, i + 1), non_linearity())
 
-        # Residual MLP feature encoder
-        hidden_dim = 256
-        self.fc_in = make_fc_layer(state_dim, hidden_dim)
-        self.res_blocks = nn.Sequential(*[ResidualBlock(hidden_dim) for _ in range(num_res_blocks)])
+    def forward(self, data):
+        return self.fc_layers(data)
+    
+class ValueNetwork(nn.Module):
+    def __init__(self, state_shape, hidden_dim=128):
+        super(ValueNetwork, self).__init__()
+        self.net = nn.Sequential(
+            nn.Linear(state_shape, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, 1)
+        )
 
-        if self.dueling:
-            # shared representation after residual blocks
-            self.fc_shared = make_fc_layer(hidden_dim, hidden_dim)
-            # Value stream
-            self.value_stream = nn.Sequential(
-                make_fc_layer(hidden_dim, hidden_dim),
-                nn.ReLU(),
-                make_fc_layer(hidden_dim, 1)
-            )
-            # Advantage stream
-            self.adv_stream = nn.Sequential(
-                make_fc_layer(hidden_dim, hidden_dim),
-                nn.ReLU(),
-                make_fc_layer(hidden_dim, action_shape)
-            )
-        else:
-            # final output layer
-            self.fc_out = make_fc_layer(hidden_dim, action_shape)
-
-        self.to(self.device)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Compute Q-values for a batch of state feature vectors.
-
-        Args:
-            x (torch.Tensor): shape [B, state_dim]
-        Returns:
-            q (torch.Tensor): shape [B, action_shape]
-        """
-        x = x.to(self.device).float()
-        out = F.relu(self.fc_in(x))
-        out = self.res_blocks(out)  # apply residual blocks
-
-        if self.dueling:
-            shared = F.relu(self.fc_shared(out))
-            val = self.value_stream(shared)            # [B,1]
-            adv = self.adv_stream(shared)             # [B, A]
-            adv_mean = adv.mean(dim=1, keepdim=True)
-            q = val + adv - adv_mean
-        else:
-            q = self.fc_out(out)
-        return q
-
-# Example instantiation:
-# model = Model(
-#     state_dim=Config.DIM_OF_OBSERVATION,
-#     action_shape=8,
-#     dueling=True,
-#     num_res_blocks=3
-# ).to(model.device)
+    def forward(self, state):
+        # state: torch.Tensor of shape (batch_size, state_dim)
+        return self.net(state).squeeze(-1)  # returns (batch_size,)

@@ -12,8 +12,9 @@ import time
 import os
 import numpy as np
 import torch
+from torch import nn
 from copy import deepcopy
-from agent_target_dqn.model.model import Model
+from agent_target_dqn.model.model import Model, ValueNetwork
 from agent_target_dqn.conf.conf import Config
 from agent_target_dqn.feature.definition import ActData
 
@@ -39,13 +40,15 @@ class Algorithm:
         self.model.to(self.device)
         self.optim = torch.optim.Adam(self.model.parameters(), lr=self.lr)
         self.target_model = deepcopy(self.model)
+        self.value_net = ValueNetwork(self.obs_shape)
+        self.value_optimizer = torch.optim.Adam(self.value_net.parameters(), lr=self.lr)
         self.train_step = 0
         self.predict_count = 0
         self.last_report_monitor_time = 0
         self.logger = logger
         self.monitor = monitor
 
-    def learn(self, list_sample_data):
+    def learn(self, list_sample_data): # list of Frame
 
         t_data = list_sample_data
         batch = len(t_data)
@@ -80,7 +83,13 @@ class Algorithm:
             q = q.masked_fill(~_batch_obs_legal, float(torch.min(q)))
             q_max = q.max(dim=1).values.detach()
 
-        target_q = rew + self._gamma * q_max * not_done
+        value_model = getattr(self, "value_net") # 获取值网络
+        value_model.eval() # 设置为评估模式
+        with torch.no_grad():
+            value_s = value_model(batch_feature)
+            value_s_next = value_model(_batch_feature)
+
+        target_q = rew + self._gamma * q_max * not_done + not_done * (self._gamma * value_s_next - value_s)
 
         self.optim.zero_grad()
 
@@ -94,6 +103,14 @@ class Algorithm:
         self.optim.step()
 
         self.train_step += 1
+
+        # Update value network
+        # 更新值网络
+        returns = self.compute_returns(rew, not_done)
+        value_loss = nn.MSELoss()(value_s.view(-1), returns)
+        self.value_optimizer.zero_grad()
+        value_loss.backward()
+        self.value_optimizer.step()
 
         # Update the target network
         # 更新target网络
@@ -117,6 +134,14 @@ class Algorithm:
                 self.monitor.put_data({os.getpid(): monitor_data})
 
             self.last_report_monitor_time = now
+
+    def compute_returns(self, rewards, not_done):
+        returns = []
+        R = 0
+        for r, done in zip(reversed(rewards), reversed(not_done)):
+            R = r + self._gamma * R * (1 - not_done)
+            returns.insert(0, R)
+        return torch.tensor(returns, dtype=torch.float).to(self.device)
 
     def __convert_to_tensor(self, data):
         # Please check the data type carefully and make sure it is float32

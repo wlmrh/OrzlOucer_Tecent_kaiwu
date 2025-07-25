@@ -84,10 +84,9 @@ class Algorithm:
             q_max = q.max(dim=1).values.detach()
 
         value_model = getattr(self, "value_net") # 获取值网络
-        value_model.eval() # 设置为评估模式
         with torch.no_grad():
-            value_s = value_model(batch_feature)
             value_s_next = value_model(_batch_feature)
+            value_s = value_model(batch_feature)
 
         target_q = rew + self._gamma * q_max * not_done + not_done * (self._gamma * value_s_next - value_s)
 
@@ -106,6 +105,8 @@ class Algorithm:
 
         # Update value network
         # 更新值网络
+        value_model.train()
+        value_s = value_model(batch_feature)
         returns = self.compute_returns(rew, not_done)
         value_loss = nn.MSELoss()(value_s.view(-1), returns)
         self.value_optimizer.zero_grad()
@@ -138,10 +139,10 @@ class Algorithm:
     def compute_returns(self, rewards, not_done):
         returns = []
         R = 0
-        for r, done in zip(reversed(rewards), reversed(not_done)):
-            R = r + self._gamma * R * (1 - not_done)
+        for r, ndone in zip(reversed(rewards), reversed(not_done)):
+            R = r + self._gamma * R * (1 - ndone)
             returns.insert(0, R)
-        return torch.tensor(returns, dtype=torch.float).to(self.device)
+        return torch.stack(returns, dim=0).to(self.device)
 
     def __convert_to_tensor(self, data):
         # Please check the data type carefully and make sure it is float32

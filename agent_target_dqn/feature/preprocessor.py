@@ -23,6 +23,8 @@ class Preprocessor: # 该类存储并处理游戏相关的状态信息
     def __init__(self) -> None:
         self.move_action_num = 8
         self.reset()
+        self.understand = np.zeros((128, 128), dtype=np.int8) # 记录每个位置是否已经被发现
+        self.reached = np.zeros((128, 128), dtype=np.int8) # 记录每个位置是否已经到达
 
     def reset(self):
         self.step_no = 0 # 当前步数
@@ -32,6 +34,8 @@ class Preprocessor: # 该类存储并处理游戏相关的状态信息
         self.is_end_pos_found = False # 是否找到终点位置
         self.history_pos = [] # 曾到过的位置
         self.bad_move_ids = set() # 不可用的移动动作
+        self.discovery = 0 # 发现的区域
+        self.repeated = 0 # 惩罚
 
     # 参数分别为终点是否已经被找到、当前位置和认为的终点位置（如果已经找到则为真实位置，否则为预测位置）
     def _get_pos_feature(self, found, cur_pos, target_pos):
@@ -56,6 +60,25 @@ class Preprocessor: # 该类存储并处理游戏相关的状态信息
 
         hero = obs["frame_state"]["heroes"][0] # 获取英雄id
         self.cur_pos = (hero["pos"]["x"], hero["pos"]["z"])
+        self.reached[self.cur_pos[0]][self.cur_pos[1]] += 1
+        self.repeated = self.reached[self.cur_pos[0]][self.cur_pos[1]] - 1 # 当前位置被多次访问的次数
+
+        # 发现的地块信息
+        self.discovery = 0
+        for i in range(11):
+            real_i = i - 5
+            for j in range(11):
+                real_j = j - 5
+                crt_x = real_i + self.cur_pos[0]
+                if (crt_x < 0 or crt_x > 127):
+                    continue
+                crt_y = real_j + self.cur_pos[1]
+                if (crt_y < 0 or crt_y > 127):
+                    continue
+                if self.understand[crt_x][crt_y] == 0:
+                    self.discovery += 1
+                    self.understand[crt_x][crt_y] = 1
+
 
         # History position
         # 历史位置
@@ -119,7 +142,7 @@ class Preprocessor: # 该类存储并处理游戏相关的状态信息
             feature,
             legal_action,
             # 第一个参数为当前位置到终点的归一化后的距离，第二个参数为当前位置到起始位置的归一化后的距离
-            reward_process(self.feature_end_pos[-1], self.feature_history_pos[-1])
+            reward_process(self.feature_end_pos[-1], self.feature_history_pos[-1], self.discovery, self.repeated)
         )
 
     def get_legal_action(self):

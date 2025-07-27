@@ -36,9 +36,9 @@ class Agent(BaseAgent):
         self.algorithm = Algorithm(device, logger, monitor)
         self.preprocessor = Preprocessor()
         self.last_action = -1
-        self.win_history = [] # 游戏结果历史记录
+        self.win_history = []
 
-    def update_win_rate(self, is_win): # 将游戏结果更新到历史记录中并计算胜率
+    def update_win_rate(self, is_win):
         self.win_history.append(is_win)
         if len(self.win_history) > 100:
             self.win_history.pop(0)

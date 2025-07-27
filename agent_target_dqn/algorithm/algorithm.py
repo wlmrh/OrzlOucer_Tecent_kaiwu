@@ -12,9 +12,8 @@ import time
 import os
 import numpy as np
 import torch
-from torch import nn
 from copy import deepcopy
-from agent_target_dqn.model.model import Model, ValueNetwork
+from agent_target_dqn.model.model import Model
 from agent_target_dqn.conf.conf import Config
 from agent_target_dqn.feature.definition import ActData
 
@@ -34,32 +33,26 @@ class Algorithm:
         self.device = device
         self.model = Model(
             state_shape=self.obs_shape,
-            action_shape=self.act_shape,
+            action_shape=self.act_shape + self.talent_direction,
             softmax=False,
         )
         self.model.to(self.device)
         self.optim = torch.optim.Adam(self.model.parameters(), lr=self.lr)
         self.target_model = deepcopy(self.model)
-        self.value_net = ValueNetwork(self.obs_shape)
-        self.value_optimizer = torch.optim.Adam(self.value_net.parameters(), lr=self.lr)
         self.train_step = 0
         self.predict_count = 0
         self.last_report_monitor_time = 0
         self.logger = logger
         self.monitor = monitor
 
-    def learn(self, list_sample_data): # list of Frame
+    def learn(self, list_sample_data):
 
         t_data = list_sample_data
         batch = len(t_data)
 
-        # 提取出每一帧的 s 状态观察到的特征
         batch_feature_vec = [frame.obs for frame in t_data]
-        # 提取出每一帧的从状态s到状态s'进行的动作，并从转化为列向量
         batch_action = torch.LongTensor(np.array([int(frame.act) for frame in t_data])).view(-1, 1).to(self.device)
-        # 提取出每一帧的到达状态 s' 后合法动作掩码
         _batch_obs_legal = torch.stack([frame._obs_legal for frame in t_data]).bool().to(self.device)
-        # 提取出每一帧的 s' 状态观察到的特征
         _batch_feature_vec = [frame._obs for frame in t_data]
 
         rew = torch.tensor(
@@ -76,19 +69,14 @@ class Algorithm:
         batch_feature = self.__convert_to_tensor(batch_feature_vec)
         _batch_feature = self.__convert_to_tensor(_batch_feature_vec)
 
-        model = getattr(self, "target_model") # 获取目标网络
-        model.eval() # 设置为评估模式
+        model = getattr(self, "target_model")
+        model.eval()
         with torch.no_grad():
             q = model(_batch_feature)
             q = q.masked_fill(~_batch_obs_legal, float(torch.min(q)))
             q_max = q.max(dim=1).values.detach()
 
-        value_model = getattr(self, "value_net") # 获取值网络
-        with torch.no_grad():
-            value_s_next = value_model(_batch_feature)
-            value_s = value_model(batch_feature)
-
-        target_q = rew + self._gamma * q_max * not_done + not_done * (self._gamma * value_s_next - value_s)
+        target_q = rew + self._gamma * q_max * not_done
 
         self.optim.zero_grad()
 
@@ -102,16 +90,6 @@ class Algorithm:
         self.optim.step()
 
         self.train_step += 1
-
-        # Update value network
-        # 更新值网络
-        value_model.train()
-        value_s = value_model(batch_feature)
-        returns = self.compute_returns(rew, not_done)
-        value_loss = nn.MSELoss()(value_s.view(-1), returns)
-        self.value_optimizer.zero_grad()
-        value_loss.backward()
-        self.value_optimizer.step()
 
         # Update the target network
         # 更新target网络
@@ -135,14 +113,6 @@ class Algorithm:
                 self.monitor.put_data({os.getpid(): monitor_data})
 
             self.last_report_monitor_time = now
-
-    def compute_returns(self, rewards, not_done):
-        returns = []
-        R = 0
-        for r, ndone in zip(reversed(rewards), reversed(not_done)):
-            R = r + self._gamma * R * (1 - ndone)
-            returns.insert(0, R)
-        return torch.stack(returns, dim=0).to(self.device)
 
     def __convert_to_tensor(self, data):
         # Please check the data type carefully and make sure it is float32

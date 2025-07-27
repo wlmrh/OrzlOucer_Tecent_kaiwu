@@ -14,42 +14,44 @@ import math
 from agent_target_dqn.feature.definition import RelativeDistance, RelativeDirection, DirectionAngles, reward_process
 
 
-def norm(v, max_v, min_v=0):  # 将值 v 归一化到 [0, 1] 范围内
-    v = np.maximum(np.minimum(max_v, v), min_v) # 将 v 限制在 [min_v, max_v] 范围内
+def norm(v, max_v, min_v=0):
+    v = np.maximum(np.minimum(max_v, v), min_v)
     return (v - min_v) / (max_v - min_v)
 
 
-class Preprocessor: # 该类存储并处理游戏相关的状态信息
+class Preprocessor:
     def __init__(self) -> None:
-        self.move_action_num = 8
+        self.move_action_num = 16
         self.reset()
-        self.understand = np.zeros((128, 128), dtype=np.int8) # 记录每个位置是否已经被发现
-        self.reached = np.zeros((128, 128), dtype=np.int8) # 记录每个位置是否已经到达
 
     def reset(self):
-        self.step_no = 0 # 当前步数
-        self.cur_pos = (0, 0) # 当前位置
-        self.cur_pos_norm = np.array((0, 0)) # 当前方向
-        self.end_pos = None # 终点位置
-        self.is_end_pos_found = False # 是否找到终点位置
-        self.history_pos = [] # 曾到过的位置
-        self.bad_move_ids = set() # 不可用的移动动作
-        self.discovery = 0 # 发现的区域
-        self.repeated = 0 # 惩罚
+        self.step_no = 0
+        self.cur_pos = (0, 0)
+        self.cur_pos_norm = np.array((0, 0))
+        self.end_pos = None
+        self.is_end_pos_found = False
+        self.history_pos = [] # 记录最近到过的10个位置
+        self.bad_move_ids = set()
+        self.can_flash = True
+        self.graph = np.zeros((128, 128), dtype=int)
+        self.discovery = 0
+        self.discovery_pri = [1.0]
+        for i in range(128):
+            for j in range(128):
+                self.graph[i, j] = -1
 
-    # 参数分别为终点是否已经被找到、当前位置和认为的终点位置（如果已经找到则为真实位置，否则为预测位置）
     def _get_pos_feature(self, found, cur_pos, target_pos):
-        relative_pos = tuple(y - x for x, y in zip(cur_pos, target_pos)) # 终点位置相对于起点位置的坐标
-        dist = np.linalg.norm(relative_pos) # 计算当前位置和终点位置的直线距离
-        target_pos_norm = norm(target_pos, 128, -128) # 归一化后的终点坐标
+        relative_pos = tuple(y - x for x, y in zip(cur_pos, target_pos))
+        dist = np.linalg.norm(relative_pos)
+        target_pos_norm = norm(target_pos, 128, -128)
         feature = np.array(
             (
                 found,
-                norm(relative_pos[0] / max(dist, 1e-4), 1, -1), # 将当前位置相对于终点位置的 x 坐标归一化到 [-1, 1] 范围
-                norm(relative_pos[1] / max(dist, 1e-4), 1, -1), 
+                norm(relative_pos[0] / max(dist, 1e-4), 1, -1),
+                norm(relative_pos[1] / max(dist, 1e-4), 1, -1),
                 target_pos_norm[0],
                 target_pos_norm[1],
-                norm(dist, 1.41 * 128), # 将当前位置和终点位置的距离归一化到 [0, 1] 范围(0 ~ 128 * sqrt(2))
+                norm(dist, 1.41 * 128),
             ),
         )
         return feature
@@ -58,27 +60,25 @@ class Preprocessor: # 该类存储并处理游戏相关的状态信息
         obs, _ = frame_state
         self.step_no = obs["frame_state"]["step_no"]
 
-        hero = obs["frame_state"]["heroes"][0] # 获取英雄id
+        hero = obs["frame_state"]["heroes"][0]
         self.cur_pos = (hero["pos"]["x"], hero["pos"]["z"])
-        self.reached[self.cur_pos[0]][self.cur_pos[1]] += 1
-        self.repeated = self.reached[self.cur_pos[0]][self.cur_pos[1]] - 1 # 当前位置被多次访问的次数
 
-        # 发现的地块信息
+        if hero['talent']['status'] == 0:
+            self.can_flash = False
+
+        # Discovery land info
+        # 探索到的新地块
         self.discovery = 0
-        for i in range(11):
-            real_i = i - 5
-            for j in range(11):
-                real_j = j - 5
-                crt_x = real_i + self.cur_pos[0]
-                if (crt_x < 0 or crt_x > 127):
-                    continue
-                crt_y = real_j + self.cur_pos[1]
-                if (crt_y < 0 or crt_y > 127):
-                    continue
-                if self.understand[crt_x][crt_y] == 0:
-                    self.discovery += 1
-                    self.understand[crt_x][crt_y] = 1
-
+        for r, row_data in enumerate(obs["map_info"]):
+            for c, value in enumerate(row_data['values']):
+                if (self.graph[r, c] == -1):
+                    self.graph[r, c] = value
+                    if value == 2:
+                        continue
+                    if value == 3:
+                        self.discovery += 2
+                    elif value == 4 or value == 5:
+                        self.discovery += 1
 
         # History position
         # 历史位置
@@ -141,11 +141,13 @@ class Preprocessor: # 该类存储并处理游戏相关的状态信息
         return (
             feature,
             legal_action,
-            # 第一个参数为当前位置到终点的归一化后的距离，第二个参数为当前位置到起始位置的归一化后的距离
-            reward_process(self.feature_end_pos[-1], self.feature_history_pos[-1], self.discovery, self.repeated)
+            reward_process(self.feature_end_pos[-1], self.feature_history_pos[-1], self.discovery, self.discovery_pri)
         )
 
     def get_legal_action(self):
+        if not self.can_flash:
+            for idx in range(8, 16):
+                self.bad_move_ids.add(idx)
         # if last_action is move and current position is the same as last position, add this action to bad_move_ids
         # 如果上一步的动作是移动，且当前位置与上一步位置相同，则将该动作加入到bad_move_ids中
         if (

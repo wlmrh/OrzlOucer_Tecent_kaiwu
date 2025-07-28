@@ -160,7 +160,7 @@ class Preprocessor:
         return (
             feature,
             legal_action,
-            reward_process(self.feature_end_pos[-1], self.feature_history_pos[-1], self.discovery, self.discovery_pri, self.dis_to_wall, self.step_no >= 500)
+            reward_process(self.feature_end_pos[-1], self.feature_history_pos[-1], self.discovery, self.discovery_pri, self.dis_to_wall, self.step_no >= 700)
         )
 
     def get_legal_action(self):

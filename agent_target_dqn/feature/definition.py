@@ -81,8 +81,9 @@ def reward_process(end_dist, history_dist, discovery, discovery_pri, wall_dis, a
 
     # end reward
     # 终点奖励
+    end_reward = 0.0
     if about_to_end:
-        end_reward = -0.02 * end_dist
+        end_reward = 0.02 / end_dist
 
     # distance reward
     # 距离奖励

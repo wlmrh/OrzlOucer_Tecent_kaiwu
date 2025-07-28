@@ -84,18 +84,3 @@ class MLP(nn.Module):
 
     def forward(self, data):
         return self.fc_layers(data)
-    
-class ValueNetwork(nn.Module):
-    def __init__(self, state_shape, hidden_dim=128):
-        super(ValueNetwork, self).__init__()
-        self.net = nn.Sequential(
-            nn.Linear(state_shape, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, 1)
-        )
-
-    def forward(self, state):
-        # state: torch.Tensor of shape (batch_size, state_dim)
-        return self.net(state).squeeze(-1)  # returns (batch_size,)

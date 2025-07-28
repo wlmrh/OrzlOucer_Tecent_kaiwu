@@ -74,7 +74,7 @@ DirectionAngles = {
 }
 
 
-def reward_process(end_dist, history_dist, discovery, discovery_pri):
+def reward_process(end_dist, history_dist, discovery, discovery_pri, wall_dis):
     # step reward
     # 步数奖励
     step_reward = -0.001
@@ -94,8 +94,10 @@ def reward_process(end_dist, history_dist, discovery, discovery_pri):
     if dist_reward == 0.001:
         discovery_pri[0] = 2.0
 
+    # 远离墙的奖励
+    wall_reward = wall_dis * 2
 
-    return [step_reward + dist_reward + end_reward + discovery_reward]
+    return [step_reward + dist_reward + end_reward + discovery_reward + wall_reward]
 
 
 @attached

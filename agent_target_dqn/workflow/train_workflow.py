@@ -18,7 +18,7 @@ from agent_target_dqn.feature.definition import (
 )
 from tools.metrics_utils import get_training_metrics
 
-# 初始化 - 跑 episode_num_every_epoch 轮游戏，并进行训练 - 是否需要保存模型 - 是否需要退出
+
 @attached
 def workflow(envs, agents, logger=None, monitor=None):
     try:
@@ -36,7 +36,6 @@ def workflow(envs, agents, logger=None, monitor=None):
             return
 
         while True:
-            # g_data 是 frame 的集合, 用于存储每一轮游戏的样本数据
             for g_data, monitor_data in run_episodes(episode_num_every_epoch, env, agent, usr_conf, logger, monitor):
                 agent.learn(g_data)
                 g_data.clear()
@@ -123,7 +122,7 @@ def run_episodes(n_episode, env, agent, usr_conf, logger, monitor):
                 step += 1
 
                 # Feature processing
-                # 特征处理，_obs_data 包括特征和合法动作
+                # 特征处理
                 _obs_data, reward_list = agent.observation_process(_obs, _extra_info)
                 reward = sum(reward_list)
 

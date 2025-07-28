@@ -35,6 +35,7 @@ class Preprocessor:
         self.can_flash = True
         self.graph = np.zeros((128, 128), dtype=int)
         self.discovery = 0
+        self.dis_to_wall = 0
         self.discovery_pri = [1.0]
         for i in range(128):
             for j in range(128):
@@ -66,19 +67,36 @@ class Preprocessor:
         if hero['talent']['status'] == 0:
             self.can_flash = False
 
-        # Discovery land info
+        # Discovery new land
         # 探索到的新地块
+        # 其中0表示不可通行，1表示可以通行，2表示起点位置，3表示终点位置，4表示宝箱位置，6表示加速增益位置。
         self.discovery = 0
         for r, row_data in enumerate(obs["map_info"]):
             for c, value in enumerate(row_data['values']):
                 if (self.graph[r, c] == -1):
                     self.graph[r, c] = value
-                    if value == 2:
-                        continue
                     if value == 3:
-                        self.discovery += 2
-                    elif value == 4 or value == 5:
+                        self.discovery += 5
+                    elif value == 1:
                         self.discovery += 1
+                    elif value == 4:
+                        self.discovery += 2
+                    elif value == 6:
+                        self.discovery += 3
+
+        # Distance to the wall
+        # 离墙距离
+        crt_dis = 0
+        for crt_dis in range(21):
+            for x_dif in range(-crt_dis, crt_dis + 1):
+                y_dif = crt_dis - abs(x_dif)
+                crt_x = x_dif + self.cur_pos[0]
+                crt_y = y_dif + self.cur_pos[1]
+                if crt_x < 0 or crt_x >= 128 or crt_y < 0 or crt_y >= 128:
+                    continue
+                if self.graph[crt_x, crt_y] == 0:
+                    break
+        self.dis_to_wall = crt_dis
 
         # History position
         # 历史位置
@@ -136,12 +154,12 @@ class Preprocessor:
 
         # Feature
         # 特征
-        feature = np.concatenate([self.cur_pos_norm, self.feature_end_pos, self.feature_history_pos, legal_action])
+        feature = np.concatenate([self.cur_pos_norm, self.feature_end_pos, self.feature_history_pos, legal_action, [norm(self.dis_to_wall, 128, 0)]])
 
         return (
             feature,
             legal_action,
-            reward_process(self.feature_end_pos[-1], self.feature_history_pos[-1], self.discovery, self.discovery_pri)
+            reward_process(self.feature_end_pos[-1], self.feature_history_pos[-1], self.discovery, self.discovery_pri, self.dis_to_wall)
         )
 
     def get_legal_action(self):

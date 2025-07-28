@@ -37,6 +37,7 @@ class Preprocessor:
         self.discovery = 0
         self.dis_to_wall = 0
         self.discovery_pri = [1.0]
+        self.is_getting_point = False
         for i in range(128):
             for j in range(128):
                 self.graph[i, j] = -1
@@ -159,7 +160,7 @@ class Preprocessor:
         return (
             feature,
             legal_action,
-            reward_process(self.feature_end_pos[-1], self.feature_history_pos[-1], self.discovery, self.discovery_pri, self.dis_to_wall)
+            reward_process(self.feature_end_pos[-1], self.feature_history_pos[-1], self.discovery, self.discovery_pri, self.dis_to_wall, self.step_no >= 500)
         )
 
     def get_legal_action(self):

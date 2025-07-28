@@ -74,14 +74,15 @@ DirectionAngles = {
 }
 
 
-def reward_process(end_dist, history_dist, discovery, discovery_pri, wall_dis):
+def reward_process(end_dist, history_dist, discovery, discovery_pri, wall_dis, about_to_end):
     # step reward
     # 步数奖励
     step_reward = -0.001
 
     # end reward
     # 终点奖励
-    end_reward = -0.02 * end_dist
+    if about_to_end:
+        end_reward = -0.02 * end_dist
 
     # distance reward
     # 距离奖励

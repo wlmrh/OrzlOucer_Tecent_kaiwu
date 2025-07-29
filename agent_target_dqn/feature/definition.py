@@ -73,6 +73,19 @@ DirectionAngles = {
     8: 315,
 }
 
+class ReplayBuffer:
+    def __init__(self, capacity):
+        self.buffer = collections.deque(maxlen=capacity)
+
+    def add(self, sample_data):
+        self.buffer.append(sample_data)
+
+    def sample(self, batch_size):
+        transitions = random.sample(self.buffer, batch_size)
+        return transitions
+
+    def size(self):  # 目前buffer中数据的数量
+        return len(self.buffer)
 
 def reward_process(end_dist, history_dist, discovery, discovery_pri, wall_dis, about_to_end):
     # step reward

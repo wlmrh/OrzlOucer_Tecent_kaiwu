@@ -11,7 +11,7 @@ Author: Tencent AI Arena Authors
 import time
 import os
 from kaiwu_agent.utils.common_func import Frame, attached
-
+from agent_target_dqn.feature.definition import ReplayBuffer
 from tools.train_env_conf_validate import read_usr_conf
 from agent_target_dqn.feature.definition import (
     sample_process,
@@ -27,6 +27,7 @@ def workflow(envs, agents, logger=None, monitor=None):
         last_save_model_time = 0
         last_put_data_time = 0
         monitor_data = {}
+        replaybuffer = ReplayBuffer(10000)
 
         # Read and validate configuration file
         # 配置文件读取和校验

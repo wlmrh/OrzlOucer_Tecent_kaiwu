@@ -20,9 +20,9 @@ from kaiwu_agent.agent.base_agent import (
     reset_wrapper,
 )
 from kaiwu_agent.utils.common_func import attached
-from agent_target_dqn.algorithm.algorithm import Algorithm
-from agent_target_dqn.feature.definition import ObsData, ActData
-from agent_target_dqn.feature.preprocessor import Preprocessor
+from agent_diy.algorithm.algorithm import Algorithm
+from agent_diy.feature.definition import ObsData, ActData
+from agent_diy.feature.preprocessor import Preprocessor
 from arena_proto.back_to_the_realm_v2.custom_pb2 import (
     RelativeDirection,
 )

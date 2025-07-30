@@ -12,7 +12,7 @@ import numpy as np
 from torch import nn
 import torch.nn.functional as F
 from typing import List
-from agent_target_dqn.conf.conf import Config
+from agent_diy.conf.conf import Config
 
 import sys
 import os
@@ -80,37 +80,32 @@ class Model(nn.Module):
 
         # 定义局部视野网格的维度
         # 假设局部网格是 11x11x5，其展平后是 11*11*5 = 605
-        self.local_grid_height = 11
-        self.local_grid_width = 11
-        self.local_grid_channels = 5
-        self.cnn_flat_dim = self.local_grid_height * self.local_grid_width * self.local_grid_channels
-
+        self.local_grid_height = Config.LOCAL_GRID_HEIGHT
+        self.local_grid_width = Config.LOCAL_GRID_WIDTH
+        self.local_grid_channels = Config.LOCAL_GRID_CHANNELS
+        self.cnn_input_dim = self.local_grid_height * self.local_grid_width * self.local_grid_channels
+        self.cnn_output_dim = 64 * 7 * 7
         # 定义辅助特征的维度
-        # 1 (冷却) + 1 (宝箱数) + 1 (步数) + 6 (宝箱距离) + 8 (宝箱方向) + 6 (终点距离) + 8 (终点方向) = 31
-        self.n_aux_features = 31
+        self.n_aux_features = Config.NUM_AUX_FEATURES
 
         # 检查传入的 state_shape 是否与预期一致
-        if self.total_input_dim != (self.cnn_flat_dim + self.n_aux_features):
-            raise ValueError(f"Expected state_shape (total_input_dim) to be {self.cnn_flat_dim + self.n_aux_features} (CNN_flat + Aux_features), but got {self.total_input_dim}")
-
+        if self.total_input_dim != (self.cnn_input_dim + self.n_aux_features):
+            raise ValueError(f"Expected state_shape (total_input_dim) to be {self.cnn_input_dim + self.n_aux_features} (CNN_flat + Aux_features), but got {self.total_input_dim}")
 
         # --- 局部视野处理流 (CNN Stream) ---
         # CNN 输入: (batch_size, channels, height, width)
         self.conv1 = nn.Conv2d(in_channels=self.local_grid_channels, out_channels=32, kernel_size=3, stride=1)
         self.conv2 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, stride=1)
-        # 经过 Conv1: (11-3+1)x(11-3+1) = 9x9
-        # 经过 Conv2: (9-3+1)x(9-3+1) = 7x7
-        # 最终展平维度 64 * 7 * 7 = 3136
 
         # --- 辅助特征处理流 (Auxiliary FC Stream) ---
         self.aux_mlp = MLP(
-            [self.n_aux_features, 64], # 输入31维，映射到64维
+            [self.n_aux_features, 64], # 输入9维，映射到64维
             "aux_mlp",
             non_linearity_last=False # 辅助流的最后一层也可以有激活函数，具体看效果
         )
 
         # --- 特征融合与决策流 (Combined FC Stream) ---
-        self.combined_input_dim = self.cnn_flat_dim + 64 # 3136 (来自CNN) + 64 (来自辅助MLP)
+        self.combined_input_dim = self.cnn_output_dim + 64 # 3136 (来自CNN) + 64 (来自辅助MLP)
         self.q_mlp = MLP(
             [self.combined_input_dim, 512, 256, action_shape],
             "q_mlp"
@@ -123,8 +118,8 @@ class Model(nn.Module):
         # 首先将其拆分成局部网格特征和辅助特征
 
         # 1. 提取局部网格特征并重塑为 CNN 输入格式
-        # feature 的前 self.cnn_flat_dim 维度是局部网格展平后的数据
-        local_grid_flat = feature[:, :self.cnn_flat_dim]
+        # feature 的前 self.cnn_input_dim 维度是局部网格展平后的数据
+        local_grid_flat = feature[:, :self.cnn_input_dim]
         # 重塑为 (batch_size, channels, height, width)
         # 注意: 如果你的原始数据是 (H, W, C)，展平后需要重新排列
         # PyTorch 的 Conv2d 要求输入是 (N, C, H, W)
@@ -134,12 +129,12 @@ class Model(nn.Module):
 
         # 2. 提取辅助特征
         # feature 的剩余维度是辅助特征
-        aux_features = feature[:, self.cnn_flat_dim:]
+        aux_features = feature[:, self.cnn_input_dim:]
 
         # --- 局部视野处理流 (CNN Stream) ---
         x_cnn = F.relu(self.conv1(local_grid_obs))
         x_cnn = F.relu(self.conv2(x_cnn))
-        x_cnn = x_cnn.view(-1, self.flat_cnn_dim) # 展平
+        x_cnn = x_cnn.view(-1, self.cnn_output_dim) # 展平
 
         # --- 辅助特征处理流 (Auxiliary FC Stream) ---
         x_aux = self.aux_mlp(aux_features) # MLP 内部已包含激活函数

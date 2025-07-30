@@ -17,7 +17,7 @@ from agent_diy.feature.definition import (
     sample_process,
 )
 from tools.metrics_utils import get_training_metrics
-
+from agent_diy.conf.conf import Config
 
 @attached
 def workflow(envs, agents, logger=None, monitor=None):
@@ -27,18 +27,6 @@ def workflow(envs, agents, logger=None, monitor=None):
         last_save_model_time = 0
         last_put_data_time = 0
         monitor_data = {}
-        replay_buffer = ReplayBuffer(Config.REPLAY_BUFFER_SIZE) # 假设 Config 中有 REPLAY_BUFFER_SIZE
-        # 预训练步数 (Pre-fill steps): 在开始学习前，先填充 Replay Buffer 到一定容量
-        logger.info(f"Starting to pre-fill replay buffer up to {Config.REPLAY_BUFFER_MIN_SIZE} experiences...")
-        while replay_buffer.size() < Config.REPLAY_BUFFER_MIN_SIZE:
-            # 运行少量回合来填充经验，不需要返回 g_data
-            g_data, _ = run_episodes(1, env, agent, usr_conf, logger, monitor)
-            # 传入 replay_buffer
-            for samples in g_data:
-                replay_buffer.add(samples)
-        logger.info(f"Replay buffer pre-filled with {replaybuffer.size()} experiences. Starting training.")
-
-
         # Read and validate configuration file
         # 配置文件读取和校验
         usr_conf = read_usr_conf("agent_diy/conf/train_env_conf.toml", logger)
@@ -46,17 +34,26 @@ def workflow(envs, agents, logger=None, monitor=None):
             logger.error(f"usr_conf is None, please check agent_diy/conf/train_env_conf.toml")
             return
 
+        replay_buffer = ReplayBuffer(Config.REPLAY_BUFFER_SIZE) # 假设 Config 中有 REPLAY_BUFFER_SIZE
+        # 预训练步数 (Pre-fill steps): 在开始学习前，先填充 Replay Buffer 到一定容量
+        logger.info(f"Starting to pre-fill replay buffer up to {Config.REPLAY_BUFFER_MIN_SIZE} experiences...")
+        while replay_buffer.size() < Config.REPLAY_BUFFER_MIN_SIZE:
+            for g_data, _ in run_episodes(1, env, agent, usr_conf, logger, monitor):
+                for sample in g_data:
+                    replay_buffer.add(sample)
+        logger.info(f"Replay buffer pre-filled with {replay_buffer.size()} experiences. Starting training.")
+
         while True:
             for g_data, monitor_data in run_episodes(episode_num_every_epoch, env, agent, usr_conf, logger, monitor):
                 # 传入 replay_buffer
                 for samples in g_data:
                     replay_buffer.add(samples)
-                if replaybuffer.size() >= Config.REPLAY_BUFFER_MIN_SIZE:
+                if replay_buffer.size() >= Config.REPLAY_BUFFER_MIN_SIZE:
                     for _ in range(Config.TRAIN_ITERATIONS_PER_EPISODE): # 假设每个回合训练多次
-                        if replaybuffer.size() < Config.BATCH_SIZE: # 防止 batch size 大于 buffer size
+                        if replay_buffer.size() < Config.BATCH_SIZE: # 防止 batch size 大于 buffer size
                             break
                         
-                        sampled_batch = replaybuffer.sample(Config.BATCH_SIZE)
+                        sampled_batch = replay_buffer.sample(Config.BATCH_SIZE)
                         agent.learn(sampled_batch)
 
             # Save model file
@@ -72,8 +69,11 @@ def workflow(envs, agents, logger=None, monitor=None):
                 monitor.put_data({os.getpid(): monitor_data})
                 last_put_data_time = now
 
+    # except Exception as e:
+    #     raise RuntimeError(f"workflow error")
     except Exception as e:
-        raise RuntimeError(f"workflow error")
+        logger.exception("workflow error")
+        raise RuntimeError("workflow error") from e
 
 
 def run_episodes(n_episode, env, agent, usr_conf, logger, monitor):
@@ -199,5 +199,6 @@ def run_episodes(n_episode, env, agent, usr_conf, logger, monitor):
                 obs_data = _obs_data
                 extra_info = _extra_info
     except Exception as e:
-        logger.error(f"run_episodes error")
-        raise RuntimeError(f"run_episodes error")
+        logger.exception("run_episodes error")
+        raise RuntimeError("run_episodes error") from e
+

@@ -23,7 +23,7 @@ class Config:
     LOCAL_GRID_FLAT_DIM = LOCAL_GRID_HEIGHT * LOCAL_GRID_WIDTH * LOCAL_GRID_CHANNELS
 
     # --- 辅助特征维度 ---
-    NUM_AUX_FEATURES = 15
+    NUM_AUX_FEATURES = 9
 
     # features: 现在 FEATURES 列表用来表示新观测中各个部分的维度
     # 注意: 这里我们将 FEATURES 定义为包含两个主要部分的维度
@@ -38,14 +38,13 @@ class Config:
         2,  # 归一化后的当前位置坐标
         2,  # 归一化后的最近宝箱（大致）坐标
         2,   # 归一化后的终点（大致）坐标
-        6 # onehot 随机障碍物位置
     ]
 
     FEATURE_SPLIT_SHAPE = FEATURES # FEATURE_SPLIT_SHAPE 保持与 FEATURES 一致
 
     # Size of observation
     # observation的维度
-    # 此时 DIM_OF_OBSERVATION = 605 + 15 = 620
+    # 此时 DIM_OF_OBSERVATION = 605 + 9 = 614
     DIM_OF_OBSERVATION = sum(FEATURES)
 
     # --- 动作空间配置 ---
@@ -65,7 +64,7 @@ class Config:
     # **注意**，此项必须正确配置，应该与definition.py中的NumpyData2SampleData函数数据对齐，否则可能报样本维度错误
     # 这里我们重新计算 SAMPLE_DIM 以反映新的观测维度和合法动作掩码
     # FRAME 结构: obs (620), _obs (620), act (1), rew (1), done (1), ret (1), obs_legal (16), _obs_legal (16)
-    # 总和: 620 * 2 + 1 + 1 + 1 + 1 + 16 * 2 = 1228 + 4 + 32 = 1276
+    # 总和: 614 * 2 + 1 + 1 + 1 + 1 + 16 * 2 = 1228 + 4 + 32 = 1264
     SAMPLE_DIM = (DIM_OF_OBSERVATION * 2) + 4 + (TOTAL_ACTION_SPACE * 2)
 
 
@@ -95,6 +94,6 @@ class Config:
 
     # 内存池相关参数
     REPLAY_BUFFER_SIZE = 30000     # 内存池最大容量
-    REPLAY_BUFFER_MIN_SIZE = 3000   # 内存池开始学习的最小容量 (例如 BATCH_SIZE * 10)
+    REPLAY_BUFFER_MIN_SIZE = 300   # 内存池开始学习的最小容量 (例如 BATCH_SIZE * 10)
     BATCH_SIZE = 32                 # 每次从内存池采样的数据量
     TRAIN_ITERATIONS_PER_EPISODE = 5 # 每个回合结束后，从内存池学习的次数

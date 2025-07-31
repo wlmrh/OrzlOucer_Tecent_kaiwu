@@ -7,49 +7,27 @@
 Author: Tencent AI Arena Authors
 """
 
-import os
-import sys
-from typing import List, Optional
 
 import torch
-import torch.nn as nn
+import numpy as np
+from torch import nn
 import torch.nn.functional as F
-
+from typing import List
 from agent_target_dqn.conf.conf import Config
 
-# Adjust thread settings based on entry point
+import sys
+import os
+
 if os.path.basename(sys.argv[0]) == "learner.py":
+    import torch
+
     torch.set_num_interop_threads(2)
     torch.set_num_threads(2)
 else:
+    import torch
+
     torch.set_num_interop_threads(4)
     torch.set_num_threads(4)
-
-
-def make_fc_layer(in_features: int, out_features: int) -> nn.Linear:
-    """
-    Create and initialize a linear layer with orthogonal weights and zero bias.
-    """
-    fc = nn.Linear(in_features, out_features)
-    nn.init.orthogonal_(fc.weight)
-    nn.init.zeros_(fc.bias)
-    return fc
-
-
-class ResidualBlock(nn.Module):
-    """
-    A simple residual block for MLP with two linear layers.
-    """
-    def __init__(self, dim: int):
-        super(ResidualBlock, self).__init__()
-        self.fc1 = make_fc_layer(dim, dim)
-        self.fc2 = make_fc_layer(dim, dim)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        identity = x
-        out = F.relu(self.fc1(x))
-        out = self.fc2(out)
-        return F.relu(out + identity)
 
 
 class Model(nn.Module):
@@ -69,3 +47,40 @@ class Model(nn.Module):
         # Action and value processing
         logits = self.q_mlp(feature)
         return logits
+
+
+def make_fc_layer(in_features: int, out_features: int):
+    # Wrapper function to create and initialize a linear layer
+    # 创建并初始化一个线性层
+    fc_layer = nn.Linear(in_features, out_features)
+
+    # initialize weight and bias
+    # 初始化权重及偏移量
+    nn.init.orthogonal(fc_layer.weight)
+    nn.init.zeros_(fc_layer.bias)
+
+    return fc_layer
+
+
+class MLP(nn.Module):
+    def __init__(
+        self,
+        fc_feat_dim_list: List[int],
+        name: str,
+        non_linearity: nn.Module = nn.ReLU,
+        non_linearity_last: bool = False,
+    ):
+        # Create a MLP object
+        # 创建一个 MLP 对象
+        super().__init__()
+        self.fc_layers = nn.Sequential()
+        for i in range(len(fc_feat_dim_list) - 1):
+            fc_layer = make_fc_layer(fc_feat_dim_list[i], fc_feat_dim_list[i + 1])
+            self.fc_layers.add_module("{0}_fc{1}".format(name, i + 1), fc_layer)
+            # no relu for the last fc layer of the mlp unless required
+            # 除非有需要，否则 mlp 的最后一个 fc 层不使用 relu
+            if i + 1 < len(fc_feat_dim_list) - 1 or non_linearity_last:
+                self.fc_layers.add_module("{0}_non_linear{1}".format(name, i + 1), non_linearity())
+
+    def forward(self, data):
+        return self.fc_layers(data)

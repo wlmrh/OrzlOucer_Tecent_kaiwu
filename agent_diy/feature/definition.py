@@ -145,12 +145,9 @@ def reward_process(raw_reward, agent_pos, prev_pos, nearest_treasure_pos, end_po
     if is_bad_action:
         processed_reward -= Config.REWARD_BAD_ACTION_PENALTY
         
-    # 5. 超级闪现奖励 (仅作为示例)
-    # 你需要根据实际情况，例如闪现后距离目标的减少量，来调整这个奖励
+    # 5. 超级闪现奖励
     if is_flash_action:
-        if prev_pos is None:
-            
-        elif nearest_treasure_pos is not None:
+        if nearest_treasure_pos is not None:
             # 计算闪现前到宝箱的距离
             dist_before_flash = calculate_distance(prev_pos, nearest_treasure_pos)
             # 计算闪现后到宝箱的距离

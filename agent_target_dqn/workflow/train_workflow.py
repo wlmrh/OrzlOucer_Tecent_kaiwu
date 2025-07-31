@@ -138,7 +138,7 @@ def run_episodes(n_episode, env, agent, usr_conf, logger, monitor):
                     )
                 elif terminated:
                     win_rate = agent.update_win_rate(True)
-                    reward = 10
+                    reward = 100
                     logger.info(
                         f"Game terminated! step_no:{step_no} score:{game_info['total_score']} win_rate:{win_rate}"
                     )

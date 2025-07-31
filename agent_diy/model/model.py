@@ -107,7 +107,7 @@ class Model(nn.Module):
         # --- 特征融合与决策流 (Combined FC Stream) ---
         self.combined_input_dim = self.cnn_output_dim + 64 # 3136 (来自CNN) + 64 (来自辅助MLP)
         self.q_mlp = MLP(
-            [self.combined_input_dim, 512, 256, action_shape],
+            [self.combined_input_dim, 128, 64, action_shape],
             "q_mlp"
         )
 

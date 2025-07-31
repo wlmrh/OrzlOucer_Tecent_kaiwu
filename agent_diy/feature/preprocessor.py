@@ -208,7 +208,8 @@ class Preprocessor:
         vision_flat = np.array(self.vision, dtype=np.float32).flatten()
         
         # 游戏数据
-        game_info = frame_state[1]["game_info"]
+        game_info = frame_state[1]
+        game_info = game_info["game_info"] if game_info is not None else None
 
         # Feature (确保所有元素都是 float32 类型的 NumPy 数组或标量)
         feature_list = [
@@ -231,14 +232,14 @@ class Preprocessor:
         # print(f"Final feature shape: {feature.shape}, dtype: {feature.dtype}")
 
         processed_reward = reward_process(
-            raw_reward=game_info["score"], # 假设 game_info["score"] 是原始奖励
+            raw_reward=game_info["score"] if game_info is not None else 0, # 假设 game_info["score"] 是原始奖励
             agent_pos=self.cur_pos,
             nearest_treasure_pos=self.near_treasure,
             end_pos=self.end_pos,
             prev_dist_to_treasure=self.pri_near_treasure_dis,
             prev_dist_to_end=self.pri_end_dis,
             current_steps=self.step_no,
-            is_terminal=(game_info["pos"] == game_info["end_pos"]),
+            is_terminal=(self.cur_pos == self.end_pos),
             is_bad_action=(self.last_action != -1 and not legal_action[self.last_action])
         )
 

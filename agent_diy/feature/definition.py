@@ -120,7 +120,7 @@ def reward_process(raw_reward, agent_pos, nearest_treasure_pos, end_pos,
 
     # 如果回合已经结束，通常不再计算距离奖励等，因为最终奖励已给出
     if is_terminal:
-        return processed_reward
+        return [processed_reward]
     
     # 2. 距离奖励 (优先宝箱，如果所有宝箱都已收集，则转向终点)
     current_dist_to_treasure = calculate_distance(agent_pos, nearest_treasure_pos)

@@ -86,12 +86,12 @@ class Config:
     START_LR = 1e-4
 
     # 奖励函数相关系数
-    REWARD_SCALE_TREASURE_DIST = 0.005  # 靠近宝箱的距离奖励缩放因子
-    REWARD_SCALE_END_DIST = 0.002      # 靠近终点的距离奖励缩放因子
+    REWARD_SCALE_TREASURE_DIST = 0.01  # 靠近宝箱的距离奖励缩放因子
+    REWARD_SCALE_END_DIST = 0.005      # 靠近终点的距离奖励缩放因子
     REWARD_TIME_PENALTY = 0.001        # 每一步的时间惩罚
     REWARD_BAD_ACTION_PENALTY = 0.01   # 无效动作惩罚
-    REWARD_GOAL_FOUND_BONUS = 0.1      # 发现终点的奖励
-
+    REWARD_GOAL_FOUND_BONUS = 0.5      # 发现终点的奖励
+    REWARD_SCALE_TERMINAL = 0.01     # 用于缩放最终的原始奖励
     # 内存池相关参数
     REPLAY_BUFFER_SIZE = 30000     # 内存池最大容量
     REPLAY_BUFFER_MIN_SIZE = 300   # 内存池开始学习的最小容量 (例如 BATCH_SIZE * 10)

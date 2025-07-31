@@ -95,9 +95,9 @@ def calculate_distance(pos1, pos2):
         return None
     return math.hypot(pos1[0] - pos2[0], pos1[1] - pos2[1])
 
-def reward_process(raw_reward, agent_pos, nearest_treasure_pos, end_pos,
+def reward_process_modified(raw_reward, agent_pos, nearest_treasure_pos, end_pos,
                 prev_dist_to_treasure, prev_dist_to_end, current_steps, is_terminal,
-                is_bad_action=False): # 新增参数：当前动作是否为无效动作
+                is_bad_action=False, is_flash_action=False): # 新增is_flash_action参数
     """
     Args:
         raw_reward (float): 环境返回的原始奖励。
@@ -115,33 +115,27 @@ def reward_process(raw_reward, agent_pos, nearest_treasure_pos, end_pos,
     """
     processed_reward = 0.0
 
-    # 1. 原始奖励：直接累加，这是最重要的奖励信号
-    processed_reward += raw_reward
-
-    # 如果回合已经结束，通常不再计算距离奖励等，因为最终奖励已给出
+    # 1. 最终奖励处理 (如果回合结束，对原始奖励进行缩放)
     if is_terminal:
-        return [processed_reward]
+        # 将原始奖励（150, 100）与塑形奖励保持在同一数量级
+        return [raw_reward * Config.REWARD_SCALE_TERMINAL]
     
-    # 2. 距离奖励 (优先宝箱，如果所有宝箱都已收集，则转向终点)
-    current_dist_to_treasure = calculate_distance(agent_pos, nearest_treasure_pos)
-    current_dist_to_end = calculate_distance(agent_pos, end_pos)
+    # 2. 距离奖励 (优先级：宝箱 > 终点)
+    # 如果有未收集的宝箱，只计算宝箱距离奖励
+    if nearest_treasure_pos is not None:
+        current_dist_to_treasure = calculate_distance(agent_pos, nearest_treasure_pos)
+        if prev_dist_to_treasure is not None:
+            distance_change_treasure = prev_dist_to_treasure - current_dist_to_treasure
+            # 只有当距离减少时才给奖励，增加时惩罚
+            processed_reward += distance_change_treasure * Config.REWARD_SCALE_TREASURE_DIST
     
-    # 如果当前有最近宝箱并且它的距离发生了变化
-    if nearest_treasure_pos is not None and prev_dist_to_treasure is not None:
-        # 只有在距离减少时才给正奖励，增加时给负奖励 (鼓励靠近)
-        distance_change_treasure = prev_dist_to_treasure - current_dist_to_treasure
-        processed_reward += distance_change_treasure * Config.REWARD_SCALE_TREASURE_DIST
-    elif nearest_treasure_pos is not None: # 如果是第一帧，没有 prev_dist，但宝箱可见，可以给一点发现奖励
-        processed_reward += Config.REWARD_GOAL_FOUND_BONUS * 0.1 # 发现宝箱的小奖励
-
-    # 终点距离奖励
-    # 只有当所有宝箱都已收集 (或者没有宝箱目标)，且终点存在时，才计算终点距离奖励
-    # 这里简化：只要终点位置已知，就计算到终点的距离奖励
-    if end_pos is not None and prev_dist_to_end is not None:
-        distance_change_end = prev_dist_to_end - current_dist_to_end
-        processed_reward += distance_change_end * Config.REWARD_SCALE_END_DIST
-    elif end_pos is not None and prev_dist_to_end is None: # 如果终点在视野内首次发现
-        processed_reward += Config.REWARD_GOAL_FOUND_BONUS # 发现终点的奖励
+    # 如果所有宝箱都已收集，且终点存在，则计算终点距离奖励
+    elif end_pos is not None:
+        current_dist_to_end = calculate_distance(agent_pos, end_pos)
+        if prev_dist_to_end is not None:
+            distance_change_end = prev_dist_to_end - current_dist_to_end
+            # 只有当距离减少时才给奖励，增加时惩罚
+            processed_reward += distance_change_end * Config.REWARD_SCALE_END_DIST
 
     # 3. 时间惩罚：每一步一个小额负奖励
     processed_reward -= Config.REWARD_TIME_PENALTY
@@ -150,10 +144,14 @@ def reward_process(raw_reward, agent_pos, nearest_treasure_pos, end_pos,
     if is_bad_action:
         processed_reward -= Config.REWARD_BAD_ACTION_PENALTY
         
-    # 其他可能的塑形奖励：
-    # - 探索奖励：访问新格子给予小奖励
-    # - 碰撞惩罚：如果撞到障碍物（如果环境能提供此信息）
-
+    # 5. 超级闪现奖励 (仅作为示例)
+    # 你需要根据实际情况，例如闪现后距离目标的减少量，来调整这个奖励
+    if is_flash_action:
+        # 假设闪现后到目标的距离变化，如果减少量很大，则给正奖励
+        # 这里需要更复杂的逻辑来判断闪现是否有效
+        # 例如：闪现后的距离变化 > 移动一格的距离
+        pass # 在你的环境中实现这个逻辑
+    
     return [processed_reward]
 
 @attached

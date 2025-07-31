@@ -32,6 +32,7 @@ class Preprocessor: # 该类存储并处理游戏相关的状态信息
         self.is_end_pos_found = False # 是否找到终点位置
         self.history_pos = [] # 曾到过的位置
         self.bad_move_ids = set() # 不可用的移动动作
+        self.can_flash = True
 
     # 参数分别为终点是否已经被找到、当前位置和认为的终点位置（如果已经找到则为真实位置，否则为预测位置）
     def _get_pos_feature(self, found, cur_pos, target_pos):
@@ -57,6 +58,9 @@ class Preprocessor: # 该类存储并处理游戏相关的状态信息
         hero = obs["frame_state"]["heroes"][0] # 获取英雄id
         self.cur_pos = (hero["pos"]["x"], hero["pos"]["z"])
 
+        if hero['talent']['status'] == 0:
+            self.can_flash = False
+            
         # History position
         # 历史位置
         self.history_pos.append(self.cur_pos)

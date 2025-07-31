@@ -33,7 +33,7 @@ class Algorithm:
         self.device = device
         self.model = Model(
             state_shape=self.obs_shape,
-            action_shape=self.act_shape,
+            action_shape=self.act_shape + self.direction_space,
             softmax=False,
         )
         self.model.to(self.device)
@@ -157,7 +157,7 @@ class Algorithm:
             # epsilon greedy
             # epsilon 贪婪
             if not exploit_flag and np.random.rand(1) < self.epsilon:
-                random_action = np.random.rand(batch, self.act_shape)
+                random_action = np.random.rand(batch, self.act_shape + self.direction_space)
                 random_action = torch.tensor(random_action, dtype=torch.float32).to(self.device)
                 random_action = random_action.masked_fill(~legal_act, 0)
                 act = random_action.argmax(dim=1).cpu().view(-1, 1).tolist()

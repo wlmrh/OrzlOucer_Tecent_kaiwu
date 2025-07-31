@@ -114,7 +114,7 @@ def SampleData2NumpyData(g_data):
 @attached
 def NumpyData2SampleData(s_data):
     obs_data_size = Config.DIM_OF_OBSERVATION
-    legal_data_size = Config.DIM_OF_ACTION_DIRECTION
+    legal_data_size = Config.DIM_OF_ACTION_DIRECTION + Config.DIM_OF_TALENT
     return SampleData(
         obs=s_data[:obs_data_size],
         _obs=s_data[obs_data_size : 2 * obs_data_size],

@@ -21,7 +21,7 @@ def norm(v, max_v, min_v=0):  # 将值 v 归一化到 [0, 1] 范围内
 
 class Preprocessor: # 该类存储并处理游戏相关的状态信息
     def __init__(self) -> None:
-        self.move_action_num = 8
+        self.move_action_num = 16
         self.reset()
 
     def reset(self):
@@ -123,6 +123,9 @@ class Preprocessor: # 该类存储并处理游戏相关的状态信息
         )
 
     def get_legal_action(self):
+        if not self.can_flash:
+            for idx in range(8, 16):
+                self.bad_move_ids.add(idx)
         # if last_action is move and current position is the same as last position, add this action to bad_move_ids
         # 如果上一步的动作是移动，且当前位置与上一步位置相同，则将该动作加入到bad_move_ids中
         if (
@@ -143,3 +146,4 @@ class Preprocessor: # 该类存储并处理游戏相关的状态信息
             return [self.move_usable] * self.move_action_num
 
         return legal_action
+

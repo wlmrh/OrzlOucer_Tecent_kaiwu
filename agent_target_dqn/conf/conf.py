@@ -19,7 +19,7 @@ class Config:
         2,
         6,
         6,
-        8,
+        16,
     ]
 
     FEATURE_SPLIT_SHAPE = FEATURES

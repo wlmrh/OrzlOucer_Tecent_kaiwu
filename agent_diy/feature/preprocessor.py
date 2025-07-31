@@ -36,7 +36,8 @@ class Preprocessor:
 
     def reset(self):
         self.step_no = 0 # 当前步数
-        self.cur_pos = (0, 0) # 当前位置
+        self.cur_pos = None # 当前位置
+        self.pri_pos = None # 上一帧的位置
         # 确保这些坐标始终是 np.array，并有默认值
         self.cur_pos_norm = np.array([0.0, 0.0], dtype=np.float32) # 当前归一化坐标
         
@@ -96,6 +97,7 @@ class Preprocessor:
         self.step_no += 1
 
         hero = obs["frame_state"]["heroes"][0]
+        self.pri_pos = self.cur_pos
         self.cur_pos = (hero["pos"]["x"], hero["pos"]["z"])
         self.last_pos_norm = self.cur_pos_norm.copy() # 拷贝旧的归一化位置
         self.cur_pos_norm = norm(self.cur_pos, self.map_size, 0) # 使用 self.map_size
@@ -234,13 +236,15 @@ class Preprocessor:
         processed_reward = reward_process(
             raw_reward=game_info["score"] if game_info is not None else 0, # 假设 game_info["score"] 是原始奖励
             agent_pos=self.cur_pos,
+            prev_pos=self.pri_pos,
             nearest_treasure_pos=self.near_treasure,
             end_pos=self.end_pos,
             prev_dist_to_treasure=self.pri_near_treasure_dis,
             prev_dist_to_end=self.pri_end_dis,
             current_steps=self.step_no,
             is_terminal=(self.cur_pos == self.end_pos),
-            is_bad_action=(self.last_action != -1 and not legal_action[self.last_action])
+            is_bad_action=(self.last_action != -1 and not legal_action[self.last_action]),
+            is_flash_action=(self.last_action > 7)
         )
 
         return (

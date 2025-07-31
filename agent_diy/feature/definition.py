@@ -97,7 +97,7 @@ def calculate_distance(pos1, pos2):
 
 def reward_process(raw_reward, agent_pos, prev_pos, nearest_treasure_pos, end_pos,
                 prev_dist_to_treasure, prev_dist_to_end, current_steps, is_terminal,
-                is_bad_action=False, can_flash=False):
+                is_bad_action=False, is_flash_action=False):
     """
     Args:
         raw_reward (float): 环境返回的原始奖励。
@@ -110,7 +110,7 @@ def reward_process(raw_reward, agent_pos, prev_pos, nearest_treasure_pos, end_po
         current_steps (int): 当前游戏步数。
         is_terminal (bool): 当前步是否是回合终止。
         is_bad_action (bool): 当前动作是否被识别为无效动作（如原地踏步）。
-
+        is_flash_action (bool): 闪现是否可用。
     Returns:
         float: 经过塑形处理后的最终奖励。
     """
@@ -148,7 +148,9 @@ def reward_process(raw_reward, agent_pos, prev_pos, nearest_treasure_pos, end_po
     # 5. 超级闪现奖励 (仅作为示例)
     # 你需要根据实际情况，例如闪现后距离目标的减少量，来调整这个奖励
     if is_flash_action:
-        if nearest_treasure_pos is not None:
+        if prev_pos is None:
+            
+        elif nearest_treasure_pos is not None:
             # 计算闪现前到宝箱的距离
             dist_before_flash = calculate_distance(prev_pos, nearest_treasure_pos)
             # 计算闪现后到宝箱的距离

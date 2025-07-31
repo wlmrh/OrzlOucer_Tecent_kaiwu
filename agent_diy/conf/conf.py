@@ -92,6 +92,9 @@ class Config:
     REWARD_BAD_ACTION_PENALTY = 0.01   # 无效动作惩罚
     REWARD_GOAL_FOUND_BONUS = 0.5      # 发现终点的奖励
     REWARD_SCALE_TERMINAL = 0.01     # 用于缩放最终的原始奖励
+    REWARD_SCALE_FLASH_DIST = 0.05  # 闪现缩短了到宝箱、终点的距离
+    REWARD_PENALTY_BAD_FLASH = 0.2  # 乱使用闪现的惩罚
+    
     # 内存池相关参数
     REPLAY_BUFFER_SIZE = 30000     # 内存池最大容量
     REPLAY_BUFFER_MIN_SIZE = 300   # 内存池开始学习的最小容量 (例如 BATCH_SIZE * 10)

@@ -12,7 +12,7 @@ Author: Tencent AI Arena Authors
 import numpy as np
 import torch
 import math
-import agent_diy.conf.conf as Config
+from agent_diy.conf.conf import Config
 from agent_diy.feature.definition import RelativeDistance, RelativeDirection, DirectionAngles, reward_process
 
 # Assuming Config is available for map dimensions, etc.

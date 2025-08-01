@@ -79,11 +79,7 @@ class Config:
     # epsilon
     EPSILON_MIN = 0.1
     EPSILON_MAX = 1.0
-<<<<<<< HEAD
     EPSILON_DECAY = 1e-6
-=======
-    EPSILON_DECAY = 1e-6 # 你的衰减速度可能需要根据训练步数调整
->>>>>>> 0c08e15bb974fd15433e13e1d7c7927f76f15151
 
     # Initial learning rate
     # 初始的学习率

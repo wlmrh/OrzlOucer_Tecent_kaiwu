@@ -12,6 +12,7 @@ Author: Tencent AI Arena Authors
 import numpy as np
 import torch
 import math
+import agent_diy.conf.conf as Config
 from agent_diy.feature.definition import RelativeDistance, RelativeDirection, DirectionAngles, reward_process
 
 # Assuming Config is available for map dimensions, etc.
@@ -53,7 +54,8 @@ class Preprocessor:
         self.near_treasure = None # 最近宝箱坐标
         self.near_treasure_norm = np.array([-1.0, -1.0], dtype=np.float32) # 最近宝箱归一化坐标，-1.0表示未找到
         self.near_treasure_dis = 1000.0 # 最近宝箱距离
-        self.get_treasure = 0 # 已收集的宝箱数量
+        self.treasures_got = 0 # 已收集的宝箱数量
+        self.get_treasure = False # 当前帧是否获得宝箱
         self.pri_near_treasure_dis = 1000.0 # 上一帧到最近宝箱的距离
         
         # 视觉信息初始化为 float32
@@ -115,14 +117,13 @@ class Preprocessor:
         self.near_treasure_dis = 1000.0
         self.near_treasure = None
         self.near_treasure_norm = np.array([-1.0, -1.0], dtype=np.float32)
+        self.get_treasure = False
 
         # 终点位置的处理，如果视野中没有，则使用默认的未找到值
         if not self.is_end_pos_found:
             self.end_pos = None
             self.end_pos_norm = np.array([-1.0, -1.0], dtype=np.float32)
             self.end_dis = 1000.0
-
-        self.get_treasure = 0 # 每次清零，重新计数当前帧收集到的宝箱
 
         for organ in obs["frame_state"]["organs"]:
             pos_dis = RelativeDistance[organ["relative_pos"]["l2_distance"]]
@@ -154,7 +155,9 @@ class Preprocessor:
             
             elif organ["sub_type"] == 4: # 如果是宝箱
                 if organ["status"] == 0: # 已被获取（空宝箱）
-                    self.get_treasure += 1
+                    if organ["pos"]["x"] == self.cur_pos[0] and organ["pos"]["z"] == self.cur_pos[1]:
+                        self.treasures_got += 1
+                        self.get_treasure = True
                     continue
                 
                 loc = (organ["pos"]["x"], organ["pos"]["z"])
@@ -217,8 +220,8 @@ class Preprocessor:
         feature_list = [
             vision_flat,
             np.array([float(self.can_flash)], dtype=np.float32), # 布尔值转浮点
-            np.array([float(self.get_treasure)], dtype=np.float32), # 整数转浮点
-            np.array([float(self.step_no)], dtype=np.float32), # 整数转浮点
+            np.array([float(self.treasures_got)], dtype=np.float32), # 整数转浮点
+            np.array([float(self.step_no / Config.MAX_STEP_NO)], dtype=np.float32), # 整数转浮点
             self.cur_pos_norm, # 已经是 np.float32 数组
             self.near_treasure_norm, # 已经是 np.float32 数组，包含填充值
             self.end_pos_norm # 已经是 np.float32 数组，包含填充值

@@ -57,6 +57,9 @@ class Config:
     # 总动作空间维度 (8个移动 + 8个闪现 = 16)
     TOTAL_ACTION_SPACE = DIM_OF_ACTION_DIRECTION + DIM_OF_TALENT
 
+    # 最大步数
+    MAX_STEP_NO = 2000
+
     # Input dimension of reverb sample on learner. Note that different algorithms have different dimensions.
     # **Note**, this item must be configured correctly and should be aligned with the NumpyData2SampleData function data in definition.py
     # Otherwise the sample dimension error may be reported
@@ -91,11 +94,11 @@ class Config:
     REWARD_TIME_PENALTY = 0.001        # 每一步的时间惩罚
     REWARD_BAD_ACTION_PENALTY = 0.01   # 无效动作惩罚
     REWARD_GOAL_FOUND_BONUS = 0.5      # 发现终点的奖励
-    REWARD_SCALE_TERMINAL = 0.005     # 用于缩放最终的原始奖励
+    REWARD_SCALE_TERMINAL = 0.01     # 用于缩放最终的原始奖励
     REWARD_SCALE_FLASH_DIST = 0.2  # 闪现缩短了到宝箱、终点的距离
     REWARD_PENALTY_BAD_FLASH = 0.2  # 乱使用闪现的惩罚
     REWARD_EXPLORATION_BONUS = 0.005    # 探索奖励
-    REWARD_FAILED_PENALTY = 5.0 # 游戏失败惩罚
+    REWARD_FAILED_PENALTY = 10.0 # 游戏失败惩罚
     
     # 内存池相关参数
     REPLAY_BUFFER_SIZE = 30000     # 内存池最大容量

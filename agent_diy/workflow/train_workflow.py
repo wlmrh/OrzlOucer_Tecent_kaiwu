@@ -107,7 +107,7 @@ def run_episodes(n_episode, env, agent, usr_conf, logger, monitor):
 
             # Feature processing
             # 特征处理
-            obs_data, _ = agent.observation_process(obs, extra_info)
+            obs_data, _ = agent.observation_process(obs, extra_info, is_truncated = 1) # 不需要奖励函数项
 
             done = False
             step = 0
@@ -142,7 +142,7 @@ def run_episodes(n_episode, env, agent, usr_conf, logger, monitor):
 
                 # Feature processing
                 # 特征处理
-                _obs_data, reward_list = agent.observation_process(_obs, _extra_info)
+                _obs_data, reward_list = agent.observation_process(_obs, _extra_info, truncated)
                 reward = sum(reward_list)
 
                 # Determine task over, and update the number of victories
@@ -150,13 +150,11 @@ def run_episodes(n_episode, env, agent, usr_conf, logger, monitor):
                 game_info = _extra_info["game_info"]
                 if truncated:
                     win_rate = agent.update_win_rate(False)
-                    reward = -3
                     logger.info(
                         f"Game truncated! step_no:{step_no} score:{game_info['total_score']} win_rate:{win_rate}"
                     )
                 elif terminated:
                     win_rate = agent.update_win_rate(True)
-                    reward = 100
                     logger.info(
                         f"Game terminated! step_no:{step_no} score:{game_info['total_score']} win_rate:{win_rate}"
                     )

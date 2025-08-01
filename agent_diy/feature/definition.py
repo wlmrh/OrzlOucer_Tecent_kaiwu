@@ -97,7 +97,7 @@ def calculate_distance(pos1, pos2):
 
 def reward_process(raw_reward, agent_pos, prev_pos, nearest_treasure_pos, end_pos,
                 prev_dist_to_treasure, prev_dist_to_end, current_steps, is_terminal,
-                is_bad_action=False, is_flash_action=False):
+                is_bad_action=False, is_flash_used=False, is_truncated):
     """
     Args:
         raw_reward (float): 环境返回的原始奖励。
@@ -110,77 +110,55 @@ def reward_process(raw_reward, agent_pos, prev_pos, nearest_treasure_pos, end_po
         current_steps (int): 当前游戏步数。
         is_terminal (bool): 当前步是否是回合终止。
         is_bad_action (bool): 当前动作是否被识别为无效动作（如原地踏步）。
-        is_flash_action (bool): 闪现是否可用。
+        is_flash_used (bool): 闪现是否可用。
+        is_truncated: 游戏是否失败
     Returns:
-        float: 经过塑形处理后的最终奖励。
+        list [float]: 经过塑形处理后的最终奖励。
     """
     processed_reward = 0.0
     processed_reward += raw_reward * Config.REWARD_SCALE_TERMINAL
 
     # 1. 最终奖励处理 (如果回合结束，对原始奖励进行缩放)
     if is_terminal:
+        if is_truncated:
+            processed_reward -= Config.REWARD_FAILED_PENALTY
         return [processed_reward]
-    
-    # 2. 距离奖励 (优先级：宝箱 > 终点)
-    # 如果有未收集的宝箱，只计算宝箱距离奖励
-    if nearest_treasure_pos is not None:
-        current_dist_to_treasure = calculate_distance(agent_pos, nearest_treasure_pos)
-        if prev_dist_to_treasure is not None:
-            distance_change_treasure = prev_dist_to_treasure - current_dist_to_treasure
-            # 只有当距离减少时才给奖励，增加时惩罚
-            processed_reward += distance_change_treasure * Config.REWARD_SCALE_TREASURE_DIST
-    
-    # 如果所有宝箱都已收集，且终点存在，则计算终点距离奖励
-    elif end_pos is not None:
-        current_dist_to_end = calculate_distance(agent_pos, end_pos)
-        if prev_dist_to_end is not None:
-            distance_change_end = prev_dist_to_end - current_dist_to_end
-            # 只有当距离减少时才给奖励，增加时惩罚
-            processed_reward += distance_change_end * Config.REWARD_SCALE_END_DIST
 
-    # 3. 时间惩罚：每一步一个小额负奖励
+    # 2. 时间惩罚：每一步一个小额负奖励
     processed_reward -= Config.REWARD_TIME_PENALTY
 
-    # 4. 无效行动惩罚
+    # 3. 无效行动惩罚
     if is_bad_action:
         processed_reward -= Config.REWARD_BAD_ACTION_PENALTY
         
-    # 5. 超级闪现奖励
-    if is_flash_action:
+    # 4. 闪现奖励：只有当智能体使用了闪现时才计算
+    if is_flash_used:
+        # 确定目标，计算闪现带来的距离变化
+        target_pos = nearest_treasure_pos if nearest_treasure_pos is not None else end_pos
+        if target_pos:
+            dist_before_flash = calculate_distance(prev_pos, target_pos)
+            dist_after_flash = calculate_distance(agent_pos, target_pos)
+            flash_distance_change = dist_before_flash - dist_after_flash
+            
+            if flash_distance_change > 0:
+                processed_reward += flash_distance_change * Config.REWARD_SCALE_FLASH_DIST
+            else:
+                processed_reward -= Config.REWARD_PENALTY_BAD_FLASH
+
+    # 5. 普通移动奖励：当没有使用闪现时才计算
+    else: # is_flash_used == False
+        # 距离奖励 (优先级：宝箱 > 终点)
         if nearest_treasure_pos is not None:
-            # 计算闪现前到宝箱的距离
-            dist_before_flash = calculate_distance(prev_pos, nearest_treasure_pos)
-            # 计算闪现后到宝箱的距离
-            dist_after_flash = calculate_distance(agent_pos, nearest_treasure_pos)
-
-            # 闪现带来的距离变化（正值表示靠近）
-            flash_distance_change = dist_before_flash - dist_after_flash
-
-            # 如果闪现有效，给予高额奖励
-            if flash_distance_change > 0:
-                # 奖励值可以设定为普通距离奖励的倍数
-                processed_reward += flash_distance_change * Config.REWARD_SCALE_FLASH_DIST
-            else:
-                # 如果闪现导致距离增加，给予惩罚
-                processed_reward -= Config.REWARD_PENALTY_BAD_FLASH
-
+            current_dist_to_treasure = calculate_distance(agent_pos, nearest_treasure_pos)
+            if prev_dist_to_treasure is not None:
+                distance_change_treasure = prev_dist_to_treasure - current_dist_to_treasure
+                processed_reward += distance_change_treasure * Config.REWARD_SCALE_TREASURE_DIST
+        
         elif end_pos is not None:
-            # 计算闪现前到终点的距离
-            dist_before_flash = calculate_distance(prev_pos, end_pos)
-            # 计算闪现后到终点的距离
-            dist_after_flash = calculate_distance(agent_pos, end_pos)
-
-            # 闪现带来的距离变化（正值表示靠近）
-            flash_distance_change = dist_before_flash - dist_after_flash
-
-            # 如果闪现有效，给予高额奖励
-            if flash_distance_change > 0:
-                # 奖励值可以设定为普通距离奖励的倍数
-                processed_reward += flash_distance_change * Config.REWARD_SCALE_FLASH_DIST
-            else:
-                # 如果闪现导致距离增加，给予惩罚
-                processed_reward -= Config.REWARD_PENALTY_BAD_FLASH
-    
+            current_dist_to_end = calculate_distance(agent_pos, end_pos)
+            if prev_dist_to_end is not None:
+                distance_change_end = prev_dist_to_end - current_dist_to_end
+                processed_reward += distance_change_end * Config.REWARD_SCALE_END_DIST
     return [processed_reward]
 
 @attached

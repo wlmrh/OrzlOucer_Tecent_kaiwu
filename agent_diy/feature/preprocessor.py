@@ -242,7 +242,7 @@ class Preprocessor:
             prev_dist_to_treasure=self.pri_near_treasure_dis,
             prev_dist_to_end=self.pri_end_dis,
             current_steps=self.step_no,
-            is_terminal=(terminated == 1 or truncated == 1),
+            is_terminal=((self.cur_pos == self.end_pos) or truncated == 1),
             is_bad_action=(self.last_action != -1 and not legal_action[self.last_action]),
             is_flash_used=(self.last_action > 7),
             is_truncated=truncated

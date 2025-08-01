@@ -107,7 +107,7 @@ def run_episodes(n_episode, env, agent, usr_conf, logger, monitor):
 
             # Feature processing
             # 特征处理
-            obs_data, _ = agent.observation_process(obs, extra_info, is_truncated = 1) # 不需要奖励函数项
+            obs_data, _ = agent.observation_process(obs, extra_info) # 不需要奖励函数项
 
             done = False
             step = 0

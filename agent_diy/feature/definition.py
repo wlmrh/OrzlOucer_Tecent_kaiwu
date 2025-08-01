@@ -97,7 +97,7 @@ def calculate_distance(pos1, pos2):
 
 def reward_process(raw_reward, agent_pos, prev_pos, nearest_treasure_pos, end_pos,
                 prev_dist_to_treasure, prev_dist_to_end, current_steps, is_terminal,
-                is_bad_action=False, is_flash_used=False, is_truncated):
+                is_bad_action=False, is_flash_used=False, is_truncated=True):
     """
     Args:
         raw_reward (float): 环境返回的原始奖励。

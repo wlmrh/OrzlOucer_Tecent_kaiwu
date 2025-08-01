@@ -37,13 +37,13 @@ class Preprocessor:
 
     def reset(self):
         self.step_no = 0 # 当前步数
-        self.cur_pos = None # 当前位置
+        self.cur_pos = None # 当前位置s
         self.pri_pos = None # 上一帧的位置
         # 确保这些坐标始终是 np.array，并有默认值
-        self.cur_pos_norm = np.array([0.0, 0.0], dtype=np.float32) # 当前归一化坐标
+        self.cur_pos_norm = None # 当前归一化坐标
         
         self.end_pos = None # 终点位置
-        self.end_pos_norm = np.array([-1.0, -1.0], dtype=np.float32) # 归一化之后的终点坐标，-1.0表示未找到
+        self.end_pos_norm = None # 归一化之后的终点坐标，-1.0表示未找到
         self.is_end_pos_found = False # 记录终点位置是否已经被找到
         self.end_dis = 1000.0 # 当前到终点的距离
         self.pri_end_dis = 1000.0 # 上一帧到终点的距离
@@ -52,7 +52,7 @@ class Preprocessor:
         self.can_flash = True # 闪现是否能使用
         
         self.near_treasure = None # 最近宝箱坐标
-        self.near_treasure_norm = np.array([-1.0, -1.0], dtype=np.float32) # 最近宝箱归一化坐标，-1.0表示未找到
+        self.near_treasure_norm = None # 最近宝箱归一化坐标，-1.0表示未找到
         self.near_treasure_dis = 1000.0 # 最近宝箱距离
         self.treasures_got = 0 # 已收集的宝箱数量
         self.get_treasure = False # 当前帧是否获得宝箱
@@ -67,7 +67,7 @@ class Preprocessor:
         # 通道 4: 加速增益位置 (1) / 非加速增益位置 (0)
 
         # 用于 get_legal_action 的上一帧位置
-        self.last_pos_norm = np.array([0.0, 0.0], dtype=np.float32) 
+        self.last_pos_norm = None
         self.last_action = -1 # 上一帧的动作
 
     def _get_pos_feature(self, found, cur_pos, target_pos): # 暂时没用
@@ -101,7 +101,7 @@ class Preprocessor:
         hero = obs["frame_state"]["heroes"][0]
         self.pri_pos = self.cur_pos
         self.cur_pos = (hero["pos"]["x"], hero["pos"]["z"])
-        self.last_pos_norm = self.cur_pos_norm.copy() # 拷贝旧的归一化位置
+        self.last_pos_norm = self.cur_pos_norm
         self.cur_pos_norm = norm(self.cur_pos, self.map_size, 0) # 使用 self.map_size
 
         if hero['talent']['status'] == 0:
@@ -116,20 +116,20 @@ class Preprocessor:
         # 重置最近宝箱和终点信息，以便重新发现
         self.near_treasure_dis = 1000.0
         self.near_treasure = None
-        self.near_treasure_norm = np.array([-1.0, -1.0], dtype=np.float32)
+        self.near_treasure_norm = None
         self.get_treasure = False
 
         # 终点位置的处理，如果视野中没有，则使用默认的未找到值
         if not self.is_end_pos_found:
             self.end_pos = None
-            self.end_pos_norm = np.array([-1.0, -1.0], dtype=np.float32)
+            self.end_pos_norm = None
             self.end_dis = 1000.0
 
         for organ in obs["frame_state"]["organs"]:
             pos_dis = RelativeDistance[organ["relative_pos"]["l2_distance"]]
             pos_dir = RelativeDirection[organ["relative_pos"]["direction"]]
             
-            if organ["sub_type"] == 3: # 如果是终点
+            if organ["sub_type"] == 4: # 如果是终点
                 if organ["status"] != -1: # 0表示不可获取，1表示可获取, -1表示视野外
                     self.end_pos = (organ["pos"]["x"], organ["pos"]["z"])
                     self.end_pos_norm = norm(self.end_pos, self.map_size, 0) # 确保归一化
@@ -153,7 +153,7 @@ class Preprocessor:
                         self.end_pos_norm = norm(self.end_pos, self.map_size, 0) # 确保归一化
                         self.end_dis = math.hypot(self.end_pos[0] - self.cur_pos[0], self.end_pos[1] - self.cur_pos[1])
             
-            elif organ["sub_type"] == 4: # 如果是宝箱
+            elif organ["sub_type"] == 1: # 如果是宝箱
                 if organ["status"] == 0: # 已被获取（空宝箱）
                     if organ["pos"]["x"] == self.cur_pos[0] and organ["pos"]["z"] == self.cur_pos[1]:
                         self.treasures_got += 1
@@ -261,7 +261,9 @@ class Preprocessor:
         # if last_action is move and current position is the same as last position, add this action to bad_move_ids
         # 如果上一步的动作是移动，且当前位置与上一步位置相同，则将该动作加入到bad_move_ids中
         if (
-            abs(self.cur_pos_norm[0] - self.last_pos_norm[0]) < 0.001
+            self.last_pos_norm is not None
+            and self.last_action is not None
+            and abs(self.cur_pos_norm[0] - self.last_pos_norm[0]) < 0.001
             and abs(self.cur_pos_norm[1] - self.last_pos_norm[1]) < 0.001
             and self.last_action > -1
         ):

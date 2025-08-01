@@ -160,7 +160,7 @@ def reward_process(raw_reward, agent_pos, prev_pos, nearest_treasure_pos, end_po
 
     # 5. 普通移动奖励：当没有使用闪现时才计算
     else: # is_flash_used == False
-        if pre_dist is not None:
+        if dist_before is not None:
             processed_reward += distance_change * Config.REWARD_SCALE_END_DIST
 
     return [processed_reward]

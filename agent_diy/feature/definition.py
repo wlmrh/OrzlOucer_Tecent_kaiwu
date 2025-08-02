@@ -97,7 +97,7 @@ def calculate_distance(pos1, pos2):
 
 def reward_process(raw_reward, collected_treasures_count , agent_pos, prev_pos, nearest_treasure_pos, end_pos,
                 current_dist_to_treasure, prev_dist_to_treasure, current_dist_to_end, prev_dist_to_end, 
-                current_steps, is_terminal, is_flash_used=False):
+                current_steps, is_terminal, is_bad_action, is_flash_used=False, is_getting_treasure=False):
     """
     Args:
         raw_reward (float): 环境返回的原始奖励。
@@ -112,11 +112,15 @@ def reward_process(raw_reward, collected_treasures_count , agent_pos, prev_pos, 
         prev_dist_to_end (float/None): 上一帧智能体到终点的距离。
         current_steps (int): 当前游戏步数。
         is_terminal (bool): 当前步是否是回合终止。
+        is_bad_action (bool): 当前步是否是坏行为。
         is_flash_used (bool): 闪现是否可用。
+        is_getting_treasure (bool): 当前帧是否获得宝箱。
     Returns:
         list [float]: 经过塑形处理后的最终奖励。
     """
     # 0. 已获得宝箱的奖励和当前帧的奖励
+    if is_getting_treasure: # 不和 raw_reward 重复算宝箱奖励
+        collected_treasures_count -= 1
     processed_reward = collected_treasures_count * Config.REWARD_TREASURE_BONUS
     processed_reward += raw_reward * Config.REWARD_SCALE_TERMINAL
 
@@ -124,9 +128,11 @@ def reward_process(raw_reward, collected_treasures_count , agent_pos, prev_pos, 
     if is_terminal:
         return [processed_reward]
 
-    # 2. 时间惩罚：惩罚系数随时间变化
+    # 2. 时间惩罚和低效行动惩罚
     time_penalty = Config.REWARD_TIME_PENALTY * (current_steps / Config.MAX_STEP_NO)
     processed_reward -= time_penalty
+    if is_bad_action:
+        processed_reward -= Config.REWARD_BAD_ACTION_PENALTY
 
     target_pos = None
     dist_to_treasure = float('inf')

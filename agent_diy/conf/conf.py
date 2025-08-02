@@ -91,7 +91,7 @@ class Config:
     # --- 奖励函数相关系数 ---
     # 1. 最终奖励与失败惩罚
     # 将环境的原始奖励（如100分）缩放到与每一步的奖励在同一量级
-    REWARD_SCALE_TERMINAL = 0.05
+    REWARD_SCALE_TERMINAL = 0.01
 
     # 2. 核心奖励信号
     # 每收集一个宝箱，给予的额外奖励。这个奖励是持续的，每一步都会得到
@@ -108,6 +108,8 @@ class Config:
     REWARD_PENALTY_BAD_FLASH = 0.5
     # 每一步的时间惩罚，用于鼓励智能体快速行动，不要在原地徘徊
     REWARD_TIME_PENALTY = 0.05
+    # 低效行动的惩罚，鼓励智能体采取更有效的行动
+    REWARD_BAD_ACTION_PENALTY = 0.04
     
     # 内存池相关参数
     REPLAY_BUFFER_SIZE = 30000     # 内存池最大容量

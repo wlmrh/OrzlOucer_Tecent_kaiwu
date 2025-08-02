@@ -47,13 +47,14 @@ class Preprocessor:
         self.prev_dist_to_end = float("inf") # 上一帧到终点的距离
         self.bad_move_ids = set() # 记录非法操作
         self.can_flash = True # 闪现是否可用
+        self.is_bad_action = False # 是否是坏操作
 
         self.nearest_treasure_pos = None # 最近宝箱坐标
         self.nearest_treasure_pos_norm = None # 归一化最近宝箱坐标
         self.current_dist_to_treasure = float("inf") # 最近宝箱距离
         self.prev_dist_to_treasure = float("inf") # 上一帧到最近宝箱的距离
         self.treasures_got = [] # 已收集的宝箱坐标
-        self.get_treasure = False # 当前帧是否获得宝箱
+        self.is_getting_treasure = False # 当前帧是否获得宝箱
         
         # 视觉信息初始化为 float32
         self.vision = [np.zeros((11, 11), dtype=np.float32) for _ in range(5)]
@@ -75,6 +76,16 @@ class Preprocessor:
         return delta_x, delta_z
 
     def pb2struct(self, frame_state, last_action):
+        if vision[1][5, 6] == 1.0 or vision[1][5, 4] == 1.0 or vision[1][4, 5] == 1.0
+        or vision[1][6, 5] == 1.0 or vision[1][6, 6] == 1.0 or vision[1][4, 4] == 1.0
+        or vision[1][4, 6] == 1.0 or vision[1][6, 4] == 1.0:
+            self.is_bad_action = True
+        else:
+            self.is_bad_action = False
+
+        # 如果有障碍物，则不允许闪现
+        self.can_flash = False
+
         obs, _ = frame_state
         self.current_steps += 1
 
@@ -96,7 +107,7 @@ class Preprocessor:
         
         # 重置最近宝箱距离，以便重新发现
         self.current_dist_to_treasure = float("inf")
-        self.get_treasure = False
+        self.is_getting_treasure = False
 
         # 终点坐标的处理，如果视野中没有，则使用默认的未找到值
         if not self.is_end_pos_precise:
@@ -133,7 +144,7 @@ class Preprocessor:
                 if organ["status"] == 0: # 已被获取（空宝箱）
                     if organ["pos"]["x"] == self.agent_pos[0] and organ["pos"]["z"] == self.agent_pos[1]:
                         self.treasures_got.append(self.agent_pos)
-                        self.get_treasure = True
+                        self.is_getting_treasure = True
                     continue
                 
                 # 宝箱非空
@@ -228,7 +239,9 @@ class Preprocessor:
             prev_dist_to_end=self.prev_dist_to_end,
             current_steps=self.current_steps,
             is_terminal=((self.agent_pos == self.end_pos) or truncated == True),
-            is_flash_used=(self.last_action > 7)
+            is_bad_action=(self.last_action in self.bad_move_ids) or self.is_bad_action,
+            is_flash_used=(self.last_action > 7),
+            is_getting_treasure=self.is_getting_treasure
         )
 
         return (

@@ -47,7 +47,6 @@ class Preprocessor:
         self.prev_dist_to_end = float("inf") # 上一帧到终点的距离
         self.bad_move_ids = set() # 记录非法操作
         self.can_flash = True # 闪现是否可用
-        self.history_pos = [] # 历史坐标列表
 
         self.nearest_treasure_pos = None # 最近宝箱坐标
         self.nearest_treasure_pos_norm = None # 归一化最近宝箱坐标
@@ -181,10 +180,6 @@ class Preprocessor:
                     else: # 加速增益坐标 (假设 value == 6 或其他值)
                         self.vision[4][r, c] = 1.0 # 加速增益通道
 
-        self.history_pos.append(self.agent_pos) # 记录当前坐标
-        if len(self.history_pos) > 10:
-            self.history_pos.pop(0)
-
         self.last_action = last_action
 
     def process(self, frame_state, last_action, truncated):
@@ -231,10 +226,6 @@ class Preprocessor:
             prev_dist_to_treasure=self.prev_dist_to_treasure,
             current_dist_to_end=self.current_dist_to_end,
             prev_dist_to_end=self.prev_dist_to_end,
-            recent_ten_step_distances=math.hypot(
-                self.agent_pos[0] - self.history_pos[0][0],
-                self.agent_pos[1] - self.history_pos[0][1]
-            ),
             current_steps=self.current_steps,
             is_terminal=((self.agent_pos == self.end_pos) or truncated == True),
             is_flash_used=(self.last_action > 7)

@@ -88,17 +88,28 @@ class Config:
     # 初始的学习率
     START_LR = 1e-4
 
-    # 奖励函数相关系数
-    REWARD_SCALE_TREASURE_DIST = 0.05  # 靠近宝箱的距离奖励缩放因子
-    REWARD_SCALE_END_DIST = 0.02      # 靠近终点的距离奖励缩放因子
-    REWARD_TIME_PENALTY = 0.001        # 每一步的时间惩罚
-    REWARD_BAD_ACTION_PENALTY = 0.01   # 无效动作惩罚
-    REWARD_GOAL_FOUND_BONUS = 0.5      # 发现终点的奖励
-    REWARD_SCALE_TERMINAL = 1     # 用于缩放最终的原始奖励
-    REWARD_SCALE_FLASH_DIST = 0.07  # 闪现缩短了到宝箱、终点的距离
-    REWARD_PENALTY_BAD_FLASH = 0.2  # 乱使用闪现的惩罚
-    REWARD_EXPLORATION_BONUS = 0.005    # 探索奖励
-    REWARD_FAILED_PENALTY = 100.0 # 游戏失败惩罚
+    # --- 奖励函数相关系数 ---
+    # 1. 最终奖励与失败惩罚
+    # 将环境的原始奖励（如100分）缩放到与每一步的奖励在同一量级
+    REWARD_SCALE_TERMINAL = 0.05
+
+    # 2. 核心奖励信号
+    # 每收集一个宝箱，给予的额外奖励。这个奖励是持续的，每一步都会得到
+    REWARD_TREASURE_BONUS = 0.5
+    # 靠近宝箱的距离奖励，应该略高于终点奖励，以鼓励前期探索
+    REWARD_SCALE_TREASURE_DIST = 0.05
+    # 靠近终点的距离奖励，在后期权重会增加
+    REWARD_SCALE_END_DIST = 0.02
+
+    # 3. 动作奖励与惩罚
+    # 闪现奖励，比普通移动略高，鼓励高效利用
+    REWARD_SCALE_FLASH_DIST = 0.08
+    # 乱用闪现的惩罚要大，让模型学会谨慎使用
+    REWARD_PENALTY_BAD_FLASH = 0.5
+    # 每一步的时间惩罚，用于鼓励智能体快速行动，不要在原地徘徊
+    REWARD_TIME_PENALTY = 0.01
+    # 无效动作（如原地踏步）的惩罚，用于强制智能体做出有意义的移动
+    REWARD_BAD_ACTION_PENALTY = 0.02
     
     # 内存池相关参数
     REPLAY_BUFFER_SIZE = 30000     # 内存池最大容量

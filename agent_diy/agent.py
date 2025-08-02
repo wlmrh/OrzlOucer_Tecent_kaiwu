@@ -86,7 +86,7 @@ class Agent(BaseAgent):
         self.algorithm.model.load_state_dict(torch.load(model_file_path, map_location=self.algorithm.device))
         self.logger.info(f"load model {model_file_path} successfully")
 
-    def observation_process(self, obs, extra_info, truncated=1):
+    def observation_process(self, obs, extra_info, truncated=False):
         (feature_vec, legal_action, reward_list) = self.preprocessor.process([obs, extra_info], self.last_action, truncated)
         return ObsData(feature=feature_vec, legal_act=legal_action), reward_list
 

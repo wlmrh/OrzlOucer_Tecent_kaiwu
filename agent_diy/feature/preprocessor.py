@@ -28,7 +28,7 @@ def norm(v, max_v, min_v=0):
     v = np.maximum(np.minimum(max_v, v), min_v)
     return (v - min_v) / (max_v - min_v)
 
-# 0表示不可通行，1表示可以通行，2表示起点位置，3表示终点位置，4表示宝箱位置，6表示加速增益位置
+# 0表示不可通行，1表示可以通行，2表示起点坐标，3表示终点坐标，4表示宝箱坐标，6表示加速增益坐标
 class Preprocessor:
     def __init__(self) -> None:
         self.move_action_num = 16 # 总动作数量，包括移动和闪现
@@ -36,27 +36,24 @@ class Preprocessor:
         self.reset()
 
     def reset(self):
-        self.step_no = 0 # 当前步数
-        self.cur_pos = None # 当前位置s
-        self.pri_pos = None # 上一帧的位置
-        # 确保这些坐标始终是 np.array，并有默认值
-        self.cur_pos_norm = None # 当前归一化坐标
-        
-        self.end_pos = None # 终点位置
-        self.end_pos_norm = None # 归一化之后的终点坐标，-1.0表示未找到
-        self.is_end_pos_found = False # 记录终点位置是否已经被找到
-        self.end_dis = 1000.0 # 当前到终点的距离
-        self.pri_end_dis = 1000.0 # 上一帧到终点的距离
-        
-        self.bad_move_ids = set() # 用来处理在当前位置，哪些操作是非法的
-        self.can_flash = True # 闪现是否能使用
-        
-        self.near_treasure = None # 最近宝箱坐标
-        self.near_treasure_norm = None # 最近宝箱归一化坐标，-1.0表示未找到
-        self.near_treasure_dis = 1000.0 # 最近宝箱距离
-        self.treasures_got = 0 # 已收集的宝箱数量
+        self.current_steps = 0 # 当前步数
+        self.agent_pos = None # 当前坐标
+        self.agent_pos_norm = None # 归一化当前坐标
+        self.prev_pos = None # 上一帧的坐标
+        self.end_pos = None # 终点坐标
+        self.end_pos_norm = None # 归一化终点坐标
+        self.is_end_pos_precise = False # 记录终点坐标是否为准确坐标
+        self.current_dist_to_end = float("inf") # 当前到终点的距离
+        self.prev_dist_to_end = float("inf") # 上一帧到终点的距离
+        self.bad_move_ids = set() # 记录非法操作
+        self.can_flash = True # 闪现是否可用
+
+        self.nearest_treasure_pos = None # 最近宝箱坐标
+        self.nearest_treasure_pos_norm = None # 归一化最近宝箱坐标
+        self.current_dist_to_treasure = float("inf") # 最近宝箱距离
+        self.prev_dist_to_treasure = float("inf") # 上一帧到最近宝箱的距离
+        self.treasures_got = [] # 已收集的宝箱坐标
         self.get_treasure = False # 当前帧是否获得宝箱
-        self.pri_near_treasure_dis = 1000.0 # 上一帧到最近宝箱的距离
         
         # 视觉信息初始化为 float32
         self.vision = [np.zeros((11, 11), dtype=np.float32) for _ in range(5)]
@@ -64,28 +61,11 @@ class Preprocessor:
         # 通道 1: 障碍物 (1) / 非障碍物 (0)
         # 通道 2: 宝箱 (1) / 非宝箱 (0)
         # 通道 3: 终点 (1) / 非终点 (0)
-        # 通道 4: 加速增益位置 (1) / 非加速增益位置 (0)
+        # 通道 4: 加速增益坐标 (1) / 非加速增益坐标 (0)
 
-        # 用于 get_legal_action 的上一帧位置
+        # 用于 get_legal_action 的上一帧坐标
         self.last_pos_norm = None
         self.last_action = -1 # 上一帧的动作
-
-    def _get_pos_feature(self, found, cur_pos, target_pos): # 暂时没用
-        relative_pos = tuple(y - x for x, y in zip(cur_pos, target_pos))
-        dist = np.linalg.norm(relative_pos)
-        target_pos_norm = norm(target_pos, self.map_size, 0) # 使用 self.map_size
-        feature = np.array(
-            (
-                float(found), # 转换为浮点数
-                norm(relative_pos[0] / max(dist, 1e-4), 1, -1),
-                norm(relative_pos[1] / max(dist, 1e-4), 1, -1),
-                target_pos_norm[0],
-                target_pos_norm[1],
-                norm(dist, 1.41 * self.map_size), # 使用 self.map_size
-            ),
-            dtype=np.float32 # 确保数组类型
-        )
-        return feature
 
     def get_approx_loc(self, pos_dis, pos_dir): # 根据相对大致方位，大致距离，来计算物件的大致相对坐标
         distance = pos_dis * 20
@@ -96,90 +76,92 @@ class Preprocessor:
 
     def pb2struct(self, frame_state, last_action):
         obs, _ = frame_state
-        self.step_no += 1
+        self.current_steps += 1
 
+        # 记录上一帧的信息
+        self.prev_pos = self.agent_pos
+        self.prev_dist_to_treasure = self.current_dist_to_treasure
+        self.prev_dist_to_end = self.current_dist_to_end
+
+        # 计算本帧的信息
         hero = obs["frame_state"]["heroes"][0]
-        self.pri_pos = self.cur_pos
-        self.cur_pos = (hero["pos"]["x"], hero["pos"]["z"])
-        self.last_pos_norm = self.cur_pos_norm
-        self.cur_pos_norm = norm(self.cur_pos, self.map_size, 0) # 使用 self.map_size
+        self.agent_pos = (hero["pos"]["x"], hero["pos"]["z"])
+        self.last_pos_norm = self.agent_pos_norm
+        self.agent_pos_norm = norm(self.agent_pos, self.map_size, 0)
 
         if hero['talent']['status'] == 0:
             self.can_flash = False
-        else:
+        elif hero['talent']['status'] == 1:
             self.can_flash = True
-
-        # End and Treasure position
-        self.pri_near_treasure_dis = self.near_treasure_dis
-        self.pri_end_dis = self.end_dis
         
-        # 重置最近宝箱和终点信息，以便重新发现
-        self.near_treasure_dis = 1000.0
-        self.near_treasure = None
-        self.near_treasure_norm = None
+        # 重置最近宝箱距离，以便重新发现
+        self.current_dist_to_treasure = float("inf")
         self.get_treasure = False
 
-        # 终点位置的处理，如果视野中没有，则使用默认的未找到值
-        if not self.is_end_pos_found:
+        # 终点坐标的处理，如果视野中没有，则使用默认的未找到值
+        if not self.is_end_pos_precise:
             self.end_pos = None
             self.end_pos_norm = None
-            self.end_dis = 1000.0
+            self.current_dist_to_end = float("inf")
 
         for organ in obs["frame_state"]["organs"]:
             pos_dis = RelativeDistance[organ["relative_pos"]["l2_distance"]]
             pos_dir = RelativeDirection[organ["relative_pos"]["direction"]]
             
             if organ["sub_type"] == 4: # 如果是终点
+                if self.is_end_pos_precise: # 曾经看到过终点的位置
+                    continue
+
                 if organ["status"] != -1: # 0表示不可获取，1表示可获取, -1表示视野外
                     self.end_pos = (organ["pos"]["x"], organ["pos"]["z"])
                     self.end_pos_norm = norm(self.end_pos, self.map_size, 0) # 确保归一化
-                    self.end_dis = math.hypot(self.end_pos[0] - self.cur_pos[0], self.end_pos[1] - self.cur_pos[1])
-                    self.is_end_pos_found = True
+                    self.current_dist_to_end = math.hypot(self.end_pos[0] - self.agent_pos[0], self.end_pos[1] - self.agent_pos[1])
+                    self.is_end_pos_precise = True
                 # if end_pos is not found, use relative position to predict end_pos
-                # 如果终点位置未找到，使用相对位置预测终点位置
-                elif (not self.is_end_pos_found): # 如果未曾找到过终点，且当前帧终点不在视野内，则进行估计
+                # 如果终点坐标未找到，使用相对坐标预测终点坐标
+                elif (not self.is_end_pos_precise): # 如果未曾找到过终点，且当前帧终点不在视野内，则进行估计
                     # 注意：你这里使用 end_pos_dir 和 end_pos_dis 作为条件，但这两个变量并未在 Preprocessor 类中定义为属性，
                     # 它们可能是在之前某个作用域中的局部变量，或者你想用 pos_dir 和 pos_dis。
                     # 为了避免 undefined 错误，我暂时去掉了这些条件。
-                    # 如果你确实有这些变量，请确保它们是类属性并在适当位置更新。
+                    # 如果你确实有这些变量，请确保它们是类属性并在适当坐标更新。
                     
-                    # 只有在 self.end_pos 还是 None 且 self.is_end_pos_found 为 False 时才估算
-                    if self.end_pos is None: # 避免重复估算，只在没找到确切位置时估算一次
+                    # 只有在 self.end_pos 还是 None 且 self.is_end_pos_precise 为 False 时才估算
+                    if self.end_pos is None: # 避免重复估算，只在没找到确切坐标时估算一次
                         delta_x, delta_z = self.get_approx_loc(pos_dis, pos_dir)
                         self.end_pos = (
-                            max(0, min(self.map_size -1, round(self.cur_pos[0] + delta_x))), # 确保在地图范围内
-                            max(0, min(self.map_size -1, round(self.cur_pos[1] + delta_z))),
+                            max(0, min(self.map_size -1, round(self.agent_pos[0] + delta_x))), # 确保在地图范围内
+                            max(0, min(self.map_size -1, round(self.agent_pos[1] + delta_z))),
                         )
                         self.end_pos_norm = norm(self.end_pos, self.map_size, 0) # 确保归一化
-                        self.end_dis = math.hypot(self.end_pos[0] - self.cur_pos[0], self.end_pos[1] - self.cur_pos[1])
+                        self.current_dist_to_end = math.hypot(self.end_pos[0] - self.agent_pos[0], self.end_pos[1] - self.agent_pos[1])
             
             elif organ["sub_type"] == 1: # 如果是宝箱
                 if organ["status"] == 0: # 已被获取（空宝箱）
-                    if organ["pos"]["x"] == self.cur_pos[0] and organ["pos"]["z"] == self.cur_pos[1]:
-                        self.treasures_got += 1
+                    if organ["pos"]["x"] == self.agent_pos[0] and organ["pos"]["z"] == self.agent_pos[1]:
+                        self.treasures_got.append(self.agent_pos)
                         self.get_treasure = True
                     continue
                 
                 loc = (organ["pos"]["x"], organ["pos"]["z"])
-                distance_to_current_organ = math.hypot(loc[0] - self.cur_pos[0], loc[1] - self.cur_pos[1])
+                distance_to_current_organ = math.hypot(loc[0] - self.agent_pos[0], loc[1] - self.agent_pos[1])
                 
                 if organ["status"] != -1: # 在视野内，使用精确坐标
-                    if distance_to_current_organ < self.near_treasure_dis:
-                        self.near_treasure = loc
-                        self.near_treasure_norm = norm(loc, self.map_size, 0) # 确保归一化
-                        self.near_treasure_dis = distance_to_current_organ
+                    if distance_to_current_organ < self.current_dist_to_treasure:
+                        self.nearest_treasure_pos = loc
+                        self.nearest_treasure_pos_norm = norm(loc, self.map_size, 0) # 确保归一化
+                        self.current_dist_to_treasure = distance_to_current_organ
                 else: # 不在视野内则估算距离
                     delta_x, delta_z = self.get_approx_loc(pos_dis, pos_dir)
                     estimated_loc = (
-                        max(0, min(self.map_size -1, round(self.cur_pos[0] + delta_x))), # 确保在地图范围内
-                        max(0, min(self.map_size -1, round(self.cur_pos[1] + delta_z))),
+                        max(0, min(self.map_size -1, round(self.agent_pos[0] + delta_x))), # 确保在地图范围内
+                        max(0, min(self.map_size -1, round(self.agent_pos[1] + delta_z))),
                     )
-                    distance_to_estimated_organ = math.hypot(estimated_loc[0] - self.cur_pos[0], estimated_loc[1] - self.cur_pos[1])
+                    distance_to_estimated_organ = math.hypot(estimated_loc[0] - self.agent_pos[0], estimated_loc[1] - self.agent_pos[1])
 
-                    if distance_to_estimated_organ < self.near_treasure_dis:
-                        self.near_treasure = estimated_loc
-                        self.near_treasure_norm = norm(estimated_loc, self.map_size, 0) # 确保归一化
-                        self.near_treasure_dis = distance_to_estimated_organ
+                    if distance_to_estimated_organ < self.current_dist_to_treasure:
+                        self.nearest_treasure_pos = estimated_loc
+                        self.nearest_treasure_pos_norm = norm(estimated_loc, self.map_size, 0) # 确保归一化
+                        self.current_dist_to_treasure = distance_to_estimated_organ
         
         # 更新视野 (vision)
         # 清空所有通道以填充新数据
@@ -192,13 +174,16 @@ class Preprocessor:
                 if 0 <= r < 11 and 0 <= c < 11:
                     if value == 0: # 不可通行 (障碍物)
                         self.vision[1][r, c] = 1.0 # 障碍物通道
-                    elif value == 1 or value == 2: # 正常道路 / 起点位置
+                    elif value == 1 or value == 2: # 正常道路 / 起点坐标
                         self.vision[0][r, c] = 1.0 # 正常道路通道
-                    elif value == 3: # 终点位置
+                    elif value == 3: # 终点坐标
                         self.vision[3][r, c] = 1.0 # 终点通道
-                    elif value == 4: # 宝箱位置
-                        self.vision[2][r, c] = 1.0 # 宝箱通道
-                    else: # 加速增益位置 (假设 value == 6 或其他值)
+                    elif value == 4: # 宝箱坐标
+                        if (r, c) not in self.treasures_got:
+                            self.vision[2][r, c] = 1.0 # 宝箱通道
+                        else:
+                            self.vision[0][r, c] = 1.0 # 正常道路通道
+                    else: # 加速增益坐标 (假设 value == 6 或其他值)
                         self.vision[4][r, c] = 1.0 # 加速增益通道
 
         self.last_action = last_action
@@ -220,10 +205,10 @@ class Preprocessor:
         feature_list = [
             vision_flat,
             np.array([float(self.can_flash)], dtype=np.float32), # 布尔值转浮点
-            np.array([float(self.treasures_got)], dtype=np.float32), # 整数转浮点
-            np.array([float(self.step_no / Config.MAX_STEP_NO)], dtype=np.float32), # 整数转浮点
-            self.cur_pos_norm, # 已经是 np.float32 数组
-            self.near_treasure_norm, # 已经是 np.float32 数组，包含填充值
+            np.array([float(len(self.treasures_got))], dtype=np.float32), # 整数转浮点
+            np.array([float(self.current_steps / Config.MAX_STEP_NO)], dtype=np.float32), # 整数转浮点
+            self.agent_pos_norm, # 已经是 np.float32 数组
+            self.nearest_treasure_pos_norm, # 已经是 np.float32 数组，包含填充值
             self.end_pos_norm # 已经是 np.float32 数组，包含填充值
         ]
         
@@ -237,18 +222,20 @@ class Preprocessor:
         # print(f"Final feature shape: {feature.shape}, dtype: {feature.dtype}")
 
         processed_reward = reward_process(
-            raw_reward=game_info["score"] if game_info is not None else 0, # 假设 game_info["score"] 是原始奖励
-            agent_pos=self.cur_pos,
-            prev_pos=self.pri_pos,
-            nearest_treasure_pos=self.near_treasure,
+            raw_reward=game_info["score"] if game_info is not None else 0,
+            collected_treasures_count=len(self.treasures_got),
+            agent_pos=self.agent_pos,
+            prev_pos=self.prev_pos,
+            nearest_treasure_pos=self.nearest_treasure_pos,
             end_pos=self.end_pos,
-            prev_dist_to_treasure=self.pri_near_treasure_dis,
-            prev_dist_to_end=self.pri_end_dis,
-            current_steps=self.step_no,
-            is_terminal=((self.cur_pos == self.end_pos) or truncated == 1),
+            current_dist_to_treasure=self.current_dist_to_treasure,
+            prev_dist_to_treasure=self.prev_dist_to_treasure,
+            current_dist_to_end=self.current_dist_to_end,
+            prev_dist_to_end=self.prev_dist_to_end,
+            current_steps=self.current_steps,
+            is_terminal=((self.agent_pos == self.end_pos) or truncated == True),
             is_bad_action=(self.last_action != -1 and not legal_action[self.last_action]),
-            is_flash_used=(self.last_action > 7),
-            is_truncated=truncated
+            is_flash_used=(self.last_action > 7)
         )
 
         return (
@@ -259,12 +246,12 @@ class Preprocessor:
 
     def get_legal_action(self):
         # if last_action is move and current position is the same as last position, add this action to bad_move_ids
-        # 如果上一步的动作是移动，且当前位置与上一步位置相同，则将该动作加入到bad_move_ids中
+        # 如果上一步的动作是移动，且当前坐标与上一步坐标相同，则将该动作加入到bad_move_ids中
         if (
             self.last_pos_norm is not None
             and self.last_action is not None
-            and abs(self.cur_pos_norm[0] - self.last_pos_norm[0]) < 0.001
-            and abs(self.cur_pos_norm[1] - self.last_pos_norm[1]) < 0.001
+            and abs(self.agent_pos_norm[0] - self.last_pos_norm[0]) < 0.001
+            and abs(self.agent_pos_norm[1] - self.last_pos_norm[1]) < 0.001
             and self.last_action > -1
         ):
             self.bad_move_ids.add(self.last_action)

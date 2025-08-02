@@ -93,39 +93,41 @@ class ReplayBuffer:
 def calculate_distance(pos1, pos2):
     if pos1 is None or pos2 is None:
         return None
-    return math.hypot(pos1[0] - pos2[0], pos1[1] - pos2[1])
+    return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
 
-def reward_process(raw_reward, agent_pos, prev_pos, nearest_treasure_pos, end_pos,
-                prev_dist_to_treasure, prev_dist_to_end, current_steps, is_terminal,
-                is_bad_action=False, is_flash_used=False, is_truncated=True):
+def reward_process(raw_reward, collected_treasures_count , agent_pos, prev_pos, nearest_treasure_pos, end_pos,
+                current_dist_to_treasure, prev_dist_to_treasure, current_dist_to_end, prev_dist_to_end, 
+                current_steps, is_terminal, is_bad_action=False, is_flash_used=False):
     """
     Args:
         raw_reward (float): 环境返回的原始奖励。
+        collected_treasures_count (int): 已获得的宝箱数
         agent_pos (tuple): 智能体当前 (x, z) 坐标。
         prev_pos (tuple): 智能体上一帧 (x, z) 坐标。
         nearest_treasure_pos (tuple/None): 最近宝箱的 (x, z) 坐标或 None。
         end_pos (tuple/None): 终点的 (x, z) 坐标或 None。
+        current_dist_to_treasure (float/None): 智能体到最近宝箱的距离。
         prev_dist_to_treasure (float/None): 上一帧智能体到最近宝箱的距离。
+        current_dist_to_end (float/None): 智能体到终点的距离。
         prev_dist_to_end (float/None): 上一帧智能体到终点的距离。
         current_steps (int): 当前游戏步数。
         is_terminal (bool): 当前步是否是回合终止。
         is_bad_action (bool): 当前动作是否被识别为无效动作（如原地踏步）。
         is_flash_used (bool): 闪现是否可用。
-        is_truncated: 游戏是否失败
     Returns:
         list [float]: 经过塑形处理后的最终奖励。
     """
-    processed_reward = 0.0
+    # 0. 已获得宝箱的奖励和当前帧的奖励
+    processed_reward = collected_treasures_count * Config.REWARD_TREASURE_BONUS
     processed_reward += raw_reward * Config.REWARD_SCALE_TERMINAL
 
     # 1. 最终奖励处理 (如果回合结束，对原始奖励进行缩放)
     if is_terminal:
-        if is_truncated:
-            processed_reward -= Config.REWARD_FAILED_PENALTY
         return [processed_reward]
 
-    # 2. 时间惩罚：每一步一个小额负奖励
-    processed_reward -= Config.REWARD_TIME_PENALTY
+    # 2. 时间惩罚：惩罚系数随时间变化
+    time_penalty = Config.REWARD_TIME_PENALTY * (current_steps / Config.MAX_STEP_NO)**2
+    processed_reward -= time_penalty
 
     # 3. 无效行动惩罚
     if is_bad_action:
@@ -142,27 +144,35 @@ def reward_process(raw_reward, agent_pos, prev_pos, nearest_treasure_pos, end_po
     if end_pos is not None:
         dist_to_end = calculate_distance(agent_pos, end_pos)
     
-    if current_steps <= 0.75 * Config.MAX_STEP_NO:
-        target_pos = nearest_treasure_pos
-    else:
-        target_pos = end_pos
-
-    dist_before = calculate_distance(prev_pos, target_pos)
-    dist_after = calculate_distance(agent_pos, target_pos)
-    distance_change = dist_before - dist_after
-
+    # 引入动态权重，让模型对时间有感知
+    end_weight_factor = current_steps / Config.MAX_STEP_NO
+    treasure_weight_factor = 1 - end_weight_factor
+    
+    # 3. 闪现奖励：只有当智能体使用了闪现时才计算
     if is_flash_used:
-        if target_pos:
-            if distance_change > 0:
-                processed_reward += distance_change * Config.REWARD_SCALE_FLASH_DIST
-            else:
-                processed_reward -= Config.REWARD_PENALTY_BAD_FLASH
+        # 闪现的奖励也需要考虑动态权重
+        if nearest_treasure_pos is not None and end_pos is not None:
+            # 计算到宝箱和终点的距离变化
+            dist_change_treasure = calculate_distance(prev_pos, nearest_treasure_pos) - calculate_distance(agent_pos, nearest_treasure_pos)
+            dist_change_end = calculate_distance(prev_pos, end_pos) - calculate_distance(agent_pos, end_pos)
 
-    # 5. 普通移动奖励：当没有使用闪现时才计算
-    else: # is_flash_used == False
-        if dist_before is not None:
-            processed_reward += distance_change * Config.REWARD_SCALE_END_DIST
-
+            # 闪现奖励是两个目标的加权奖励之和
+            processed_reward += dist_change_treasure * Config.REWARD_SCALE_FLASH_DIST * treasure_weight_factor
+            processed_reward += dist_change_end * Config.REWARD_SCALE_FLASH_DIST * end_weight_factor
+            
+    # 4. 普通移动奖励：当没有使用闪现时才计算
+    else:
+        if nearest_treasure_pos is not None:
+            if prev_dist_to_treasure is not None:
+                distance_change_treasure = prev_dist_to_treasure - current_dist_to_treasure
+                processed_reward += distance_change_treasure * Config.REWARD_SCALE_TREASURE_DIST * treasure_weight_factor
+        
+        if end_pos is not None:
+            current_dist_to_end = calculate_distance(agent_pos, end_pos)
+            if prev_dist_to_end is not None:
+                distance_change_end = prev_dist_to_end - current_dist_to_end
+                processed_reward += distance_change_end * Config.REWARD_SCALE_END_DIST * end_weight_factor
+    
     return [processed_reward]
 
 @attached

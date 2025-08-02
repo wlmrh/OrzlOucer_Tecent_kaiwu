@@ -82,11 +82,12 @@ class Config:
     # epsilon
     EPSILON_MIN = 0.1
     EPSILON_MAX = 1.0
-    EPSILON_DECAY = 1e-6
+    EPSILON_DECAY = 1e-7
 
     # Initial learning rate
     # 初始的学习率
     START_LR = 1e-4
+    LR_DECAY_RATE = 0.00001
 
     # --- 奖励函数相关系数 ---
     # 1. 最终奖励与失败惩罚

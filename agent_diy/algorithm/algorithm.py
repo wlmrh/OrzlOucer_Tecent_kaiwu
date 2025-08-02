@@ -69,27 +69,38 @@ class Algorithm:
         batch_feature = self.__convert_to_tensor(batch_feature_vec)
         _batch_feature = self.__convert_to_tensor(_batch_feature_vec)
 
-        model = getattr(self, "target_model")
-        model.eval()
+        # Use the target network to get the Q value of the next state
+        # 使用 target_model 获取下一状态的 Q 值
+        self.target_model.eval()
         with torch.no_grad():
-            q = model(_batch_feature)
-            q = q.masked_fill(~_batch_obs_legal, float(torch.min(q)))
-            q_max = q.max(dim=1).values.detach()
+            q = self.target_model(_batch_feature)
+            # 修正1: 使用一个非常小的负数来掩盖非法动作，使其不影响max操作
+            q_masked = q.masked_fill(~_batch_obs_legal, float('-inf'))
+            q_max = q_masked.max(dim=1).values.detach()
 
         target_q = rew + self._gamma * q_max * not_done
 
         self.optim.zero_grad()
 
-        model = getattr(self, "model")
-        model.train()
-        logits = model(batch_feature)
+        # Use the primary network to get the Q value of the current state
+        # 使用主网络获取当前状态的 Q 值
+        self.model.train()
+        logits = self.model(batch_feature)
+        
+        # 在计算 loss 前，同样对主网络的 logits 进行掩码
+        logits_masked = logits.masked_fill(~_batch_obs_legal, float('-inf'))
+        loss = torch.square(target_q - logits_masked.gather(1, batch_action).view(-1)).mean()
 
-        loss = torch.square(target_q - logits.gather(1, batch_action).view(-1)).mean()
         loss.backward()
-        model_grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+        model_grad_norm = torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
         self.optim.step()
 
         self.train_step += 1
+
+        # 加入学习率衰减
+        new_lr = self.lr * np.exp(-Config.LR_DECAY_RATE * self.train_step)
+        for param_group in self.optim.param_groups:
+            param_group['lr'] = new_lr
 
         # Update the target network
         # 更新target网络
@@ -139,19 +150,13 @@ class Algorithm:
         legal_act = [obs_data.legal_act for obs_data in list_obs_data]
         legal_act = torch.tensor(np.array(legal_act)).bool().to(self.device)
 
-        model = self.model
-        model.eval()
+        self.model.eval()
 
-        # Exploration factor,
-        # we want epsilon to decrease as the number of prediction steps increases, until it reaches 0.1
-        # 探索因子, 我们希望epsilon随着预测步数越来越小，直到0.1为止
         self.epsilon = self.epsilon_min + (self.epsilon_max - self.epsilon_min) * np.exp(
             -self.epsilon_decay * self.predict_count
         )
 
         with torch.no_grad():
-            # epsilon greedy
-            # epsilon 贪婪
             if not exploit_flag and np.random.rand(1) < self.epsilon:
                 random_action = np.random.rand(batch, self.act_shape + self.talent_direction)
                 random_action = torch.tensor(random_action, dtype=torch.float32).to(self.device)
@@ -159,9 +164,10 @@ class Algorithm:
                 act = random_action.argmax(dim=1).cpu().view(-1, 1).tolist()
             else:
                 feature = self.__convert_to_tensor(feature_vec)
-                logits = model(feature)
-                logits = logits.masked_fill(~legal_act, float(torch.min(logits)))
-                act = logits.argmax(dim=1).cpu().view(-1, 1).tolist()
+                logits = self.model(feature)
+                # 修正4: 在预测时同样对非法动作进行掩码
+                logits_masked = logits.masked_fill(~legal_act, float('-inf'))
+                act = logits_masked.argmax(dim=1).cpu().view(-1, 1).tolist()
 
         format_action = [[instance[0] % self.direction_space, instance[0] // self.direction_space] for instance in act]
         self.predict_count += 1

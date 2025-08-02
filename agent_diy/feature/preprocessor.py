@@ -47,6 +47,7 @@ class Preprocessor:
         self.prev_dist_to_end = float("inf") # 上一帧到终点的距离
         self.bad_move_ids = set() # 记录非法操作
         self.can_flash = True # 闪现是否可用
+        self.history_pos = [] # 历史坐标列表
 
         self.nearest_treasure_pos = None # 最近宝箱坐标
         self.nearest_treasure_pos_norm = None # 归一化最近宝箱坐标
@@ -107,9 +108,11 @@ class Preprocessor:
         for organ in obs["frame_state"]["organs"]:
             pos_dis = RelativeDistance[organ["relative_pos"]["l2_distance"]]
             pos_dir = RelativeDirection[organ["relative_pos"]["direction"]]
-            
+            delta_x, delta_z = self.get_approx_loc(pos_dis, pos_dir)
+
             if organ["sub_type"] == 4: # 如果是终点
                 if self.is_end_pos_precise: # 曾经看到过终点的位置
+                    self.current_dist_to_end = math.hypot(self.end_pos[0] - self.agent_pos[0], self.end_pos[1] - self.agent_pos[1])
                     continue
 
                 if organ["status"] != -1: # 0表示不可获取，1表示可获取, -1表示视野外
@@ -119,21 +122,13 @@ class Preprocessor:
                     self.is_end_pos_precise = True
                 # if end_pos is not found, use relative position to predict end_pos
                 # 如果终点坐标未找到，使用相对坐标预测终点坐标
-                elif (not self.is_end_pos_precise): # 如果未曾找到过终点，且当前帧终点不在视野内，则进行估计
-                    # 注意：你这里使用 end_pos_dir 和 end_pos_dis 作为条件，但这两个变量并未在 Preprocessor 类中定义为属性，
-                    # 它们可能是在之前某个作用域中的局部变量，或者你想用 pos_dir 和 pos_dis。
-                    # 为了避免 undefined 错误，我暂时去掉了这些条件。
-                    # 如果你确实有这些变量，请确保它们是类属性并在适当坐标更新。
-                    
-                    # 只有在 self.end_pos 还是 None 且 self.is_end_pos_precise 为 False 时才估算
-                    if self.end_pos is None: # 避免重复估算，只在没找到确切坐标时估算一次
-                        delta_x, delta_z = self.get_approx_loc(pos_dis, pos_dir)
-                        self.end_pos = (
-                            max(0, min(self.map_size -1, round(self.agent_pos[0] + delta_x))), # 确保在地图范围内
-                            max(0, min(self.map_size -1, round(self.agent_pos[1] + delta_z))),
-                        )
-                        self.end_pos_norm = norm(self.end_pos, self.map_size, 0) # 确保归一化
-                        self.current_dist_to_end = math.hypot(self.end_pos[0] - self.agent_pos[0], self.end_pos[1] - self.agent_pos[1])
+                elif (not self.is_end_pos_precise): # 终点一直在视野外
+                    self.end_pos = (
+                        max(0, min(self.map_size -1, round(self.agent_pos[0] + delta_x))), # 确保在地图范围内
+                        max(0, min(self.map_size -1, round(self.agent_pos[1] + delta_z))),
+                    )
+                    self.end_pos_norm = norm(self.end_pos, self.map_size, 0) # 确保归一化
+                    self.current_dist_to_end = math.hypot(self.end_pos[0] - self.agent_pos[0], self.end_pos[1] - self.agent_pos[1])
             
             elif organ["sub_type"] == 1: # 如果是宝箱
                 if organ["status"] == 0: # 已被获取（空宝箱）
@@ -142,6 +137,7 @@ class Preprocessor:
                         self.get_treasure = True
                     continue
                 
+                # 宝箱非空
                 loc = (organ["pos"]["x"], organ["pos"]["z"])
                 distance_to_current_organ = math.hypot(loc[0] - self.agent_pos[0], loc[1] - self.agent_pos[1])
                 
@@ -151,7 +147,6 @@ class Preprocessor:
                         self.nearest_treasure_pos_norm = norm(loc, self.map_size, 0) # 确保归一化
                         self.current_dist_to_treasure = distance_to_current_organ
                 else: # 不在视野内则估算距离
-                    delta_x, delta_z = self.get_approx_loc(pos_dis, pos_dir)
                     estimated_loc = (
                         max(0, min(self.map_size -1, round(self.agent_pos[0] + delta_x))), # 确保在地图范围内
                         max(0, min(self.map_size -1, round(self.agent_pos[1] + delta_z))),
@@ -185,6 +180,10 @@ class Preprocessor:
                             self.vision[0][r, c] = 1.0 # 正常道路通道
                     else: # 加速增益坐标 (假设 value == 6 或其他值)
                         self.vision[4][r, c] = 1.0 # 加速增益通道
+
+        self.history_pos.append(self.agent_pos) # 记录当前坐标
+        if len(self.history_pos) > 10:
+            self.history_pos.pop(0)
 
         self.last_action = last_action
 
@@ -232,9 +231,12 @@ class Preprocessor:
             prev_dist_to_treasure=self.prev_dist_to_treasure,
             current_dist_to_end=self.current_dist_to_end,
             prev_dist_to_end=self.prev_dist_to_end,
+            recent_ten_step_distances=math.hypot(
+                self.agent_pos[0] - self.history_pos[0][0],
+                self.agent_pos[1] - self.history_pos[0][1]
+            ),
             current_steps=self.current_steps,
             is_terminal=((self.agent_pos == self.end_pos) or truncated == True),
-            is_bad_action=(self.last_action != -1 and not legal_action[self.last_action]),
             is_flash_used=(self.last_action > 7)
         )
 

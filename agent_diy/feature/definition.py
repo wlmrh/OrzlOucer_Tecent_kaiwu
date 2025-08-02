@@ -97,7 +97,7 @@ def calculate_distance(pos1, pos2):
 
 def reward_process(raw_reward, collected_treasures_count , agent_pos, prev_pos, nearest_treasure_pos, end_pos,
                 current_dist_to_treasure, prev_dist_to_treasure, current_dist_to_end, prev_dist_to_end, 
-                current_steps, is_terminal, is_bad_action=False, is_flash_used=False):
+                current_steps, is_terminal, is_flash_used=False):
     """
     Args:
         raw_reward (float): 环境返回的原始奖励。
@@ -112,7 +112,6 @@ def reward_process(raw_reward, collected_treasures_count , agent_pos, prev_pos, 
         prev_dist_to_end (float/None): 上一帧智能体到终点的距离。
         current_steps (int): 当前游戏步数。
         is_terminal (bool): 当前步是否是回合终止。
-        is_bad_action (bool): 当前动作是否被识别为无效动作（如原地踏步）。
         is_flash_used (bool): 闪现是否可用。
     Returns:
         list [float]: 经过塑形处理后的最终奖励。
@@ -126,15 +125,9 @@ def reward_process(raw_reward, collected_treasures_count , agent_pos, prev_pos, 
         return [processed_reward]
 
     # 2. 时间惩罚：惩罚系数随时间变化
-    time_penalty = Config.REWARD_TIME_PENALTY * (current_steps / Config.MAX_STEP_NO)**2
+    time_penalty = Config.REWARD_TIME_PENALTY * (current_steps / Config.MAX_STEP_NO)
     processed_reward -= time_penalty
 
-    # 3. 无效行动惩罚
-    if is_bad_action:
-        processed_reward -= Config.REWARD_BAD_ACTION_PENALTY
-
-    # 4. 闪现奖励：只有当智能体使用了闪现时才计算
-        # 确定目标，计算闪现带来的距离变化
     target_pos = None
     dist_to_treasure = float('inf')
     if nearest_treasure_pos is not None:

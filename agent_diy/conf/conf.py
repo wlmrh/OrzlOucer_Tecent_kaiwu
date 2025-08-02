@@ -107,9 +107,7 @@ class Config:
     # 乱用闪现的惩罚要大，让模型学会谨慎使用
     REWARD_PENALTY_BAD_FLASH = 0.5
     # 每一步的时间惩罚，用于鼓励智能体快速行动，不要在原地徘徊
-    REWARD_TIME_PENALTY = 0.01
-    # 无效动作（如原地踏步）的惩罚，用于强制智能体做出有意义的移动
-    REWARD_BAD_ACTION_PENALTY = 0.02
+    REWARD_TIME_PENALTY = 0.05
     
     # 内存池相关参数
     REPLAY_BUFFER_SIZE = 30000     # 内存池最大容量

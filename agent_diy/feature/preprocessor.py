@@ -76,9 +76,9 @@ class Preprocessor:
         return delta_x, delta_z
 
     def pb2struct(self, frame_state, last_action):
-        if vision[1][5, 6] == 1.0 or vision[1][5, 4] == 1.0 or vision[1][4, 5] == 1.0
-        or vision[1][6, 5] == 1.0 or vision[1][6, 6] == 1.0 or vision[1][4, 4] == 1.0
-        or vision[1][4, 6] == 1.0 or vision[1][6, 4] == 1.0:
+        if (self.vision[1][5, 6] == 1.0 or self.vision[1][5, 4] == 1.0 or self.vision[1][4, 5] == 1.0
+        or self.vision[1][6, 5] == 1.0 or self.vision[1][6, 6] == 1.0 or self.vision[1][4, 4] == 1.0
+        or self.vision[1][4, 6] == 1.0 or self.vision[1][6, 4] == 1.0):
             self.is_bad_action = True
         else:
             self.is_bad_action = False

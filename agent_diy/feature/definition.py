@@ -129,19 +129,10 @@ def reward_process(raw_reward, collected_treasures_count , agent_pos, prev_pos, 
         return [processed_reward]
 
     # 2. 时间惩罚和低效行动惩罚
-    time_penalty = Config.REWARD_TIME_PENALTY * (current_steps / Config.MAX_STEP_NO)
+    time_penalty = Config.REWARD_TIME_PENALTY * (current_steps / Config.MAX_STEP_NO) ** 2
     processed_reward -= time_penalty
     if is_bad_action:
         processed_reward -= Config.REWARD_BAD_ACTION_PENALTY
-
-    target_pos = None
-    dist_to_treasure = float('inf')
-    if nearest_treasure_pos is not None:
-        dist_to_treasure = calculate_distance(agent_pos, nearest_treasure_pos)
-
-    dist_to_end = float('inf')
-    if end_pos is not None:
-        dist_to_end = calculate_distance(agent_pos, end_pos)
     
     # 引入动态权重，让模型对时间有感知
     end_weight_factor = current_steps / Config.MAX_STEP_NO

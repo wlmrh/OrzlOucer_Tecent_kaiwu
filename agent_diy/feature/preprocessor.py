@@ -233,7 +233,7 @@ class Preprocessor:
             prev_dist_to_end=self.prev_dist_to_end,
             current_steps=self.current_steps,
             is_terminal=((self.agent_pos == self.end_pos) or truncated == True),
-            is_bad_action=(self.last_action in self.bad_move_ids) or self.is_bad_action,
+            is_bad_action=(self.last_action in self.bad_move_ids),
             is_flash_used=(self.last_action > 7),
             is_getting_treasure=self.is_getting_treasure
         )

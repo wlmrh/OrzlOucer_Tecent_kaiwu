@@ -104,11 +104,11 @@ class Config:
 
     # 3. 动作奖励与惩罚
     # 闪现奖励，比普通移动略高，鼓励高效利用
-    REWARD_SCALE_FLASH_DIST = 0.08
+    REWARD_SCALE_FLASH_DIST = 0.1
     # 乱用闪现的惩罚要大，让模型学会谨慎使用
-    REWARD_PENALTY_BAD_FLASH = 0.5
+    REWARD_PENALTY_BAD_FLASH = 0.2
     # 每一步的时间惩罚，用于鼓励智能体快速行动，不要在原地徘徊
-    REWARD_TIME_PENALTY = 0.08
+    REWARD_TIME_PENALTY = 0.03
     # 低效行动的惩罚，鼓励智能体采取更有效的行动
     REWARD_BAD_ACTION_PENALTY = 0.04
     

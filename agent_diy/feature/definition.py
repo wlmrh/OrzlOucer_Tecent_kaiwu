@@ -115,8 +115,7 @@ def reward_process(raw_reward, collected_treasures_count , agent_pos, prev_pos, 
         return [processed_reward]
 
     # 2. 时间惩罚和低效行动惩罚
-    time_penalty = Config.REWARD_TIME_PENALTY
-    processed_reward -= time_penalty
+    processed_reward = Config.REWARD_TIME_PENALTY
     if is_bad_action:
         processed_reward -= Config.REWARD_BAD_ACTION_PENALTY
 

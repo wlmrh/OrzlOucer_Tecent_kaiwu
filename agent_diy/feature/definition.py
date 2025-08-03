@@ -180,14 +180,7 @@ def SampleData2NumpyData(g_data):
 @attached
 def NumpyData2SampleData(s_data):
     obs_data_size = Config.DIM_OF_OBSERVATION
-    # 之前的问题在于这里使用了 DIM_OF_ACTION_DIRECTION (8)
-    # legal_data_size = Config.DIM_OF_ACTION_DIRECTION
-
-    # 应该使用总的动作空间维度 (16)
-    total_action_space_size = Config.TOTAL_ACTION_SPACE # 确保这个值为 16
-
-    # 定义每个部分的起始和结束索引，使其与 SampleData2NumpyData 的拼接顺序和大小一致
-
+    total_action_space_size = Config.TOTAL_ACTION_SPACE
     # obs 和 _obs 部分的长度
     current_idx = 0
     obs_end_idx = current_idx + obs_data_size

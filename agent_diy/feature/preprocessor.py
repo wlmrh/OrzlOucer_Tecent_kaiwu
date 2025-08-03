@@ -52,7 +52,7 @@ class Preprocessor:
         self.nearest_treasure_pos_norm = None # 归一化最近宝箱坐标
         self.current_dist_to_treasure = float("inf") # 最近宝箱距离
         self.prev_dist_to_treasure = float("inf") # 上一帧到最近宝箱的距离
-        self.treasures_got = [] # 已收集的宝箱坐标
+        self.treasures_got = [] # 已收集的宝箱编号
         self.is_getting_treasure = False # 当前帧是否获得宝箱
         
         # 视觉信息初始化为 float32
@@ -134,8 +134,8 @@ class Preprocessor:
             
             elif organ["sub_type"] == 1: # 如果是宝箱
                 if organ["status"] == 0: # 已被获取（空宝箱）
-                    if (organ["pos"]["x"], organ["pos"]["z"]) not in self.treasures_got:
-                        self.treasures_got.append(self.agent_pos)
+                    if orgain["config_id"] not in self.treasures_got:
+                        self.treasures_got.append(orgain["config_id"])
                         self.is_getting_treasure = True
                     continue
                 
@@ -200,11 +200,18 @@ class Preprocessor:
         game_info = frame_state[1]
         game_info = game_info["game_info"] if game_info is not None else None
 
+        # 宝箱获得情况
+        treasures_got_onehot = np.zeros(8, dtype=np.float32)
+        for treasure_id in self.treasures_got:
+            if 0 <= treasure_id < 8:
+                treasures_got_onehot[treasure_id] = 1.0
+
         # Feature (确保所有元素都是 float32 类型的 NumPy 数组或标量)
         feature_list = [
             vision_flat,
             np.array([float(self.can_flash)], dtype=np.float32), # 布尔值转浮点
             np.array([float(len(self.treasures_got))], dtype=np.float32), # 整数转浮点
+            treasures_got_onehot, # 已收集的宝箱编号，one-hot 编码
             np.array([float(self.current_steps / Config.MAX_STEP_NO)], dtype=np.float32), # 整数转浮点
             self.agent_pos_norm, # 已经是 np.float32 数组
             self.nearest_treasure_pos_norm, # 已经是 np.float32 数组，包含填充值

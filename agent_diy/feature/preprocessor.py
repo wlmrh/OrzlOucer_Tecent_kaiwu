@@ -209,7 +209,6 @@ class Preprocessor:
         feature_list = [
             vision_flat,
             np.array([float(self.can_flash)], dtype=np.float32), # 布尔值转浮点
-            np.array([float(len(self.treasures_got))], dtype=np.float32), # 整数转浮点
             treasures_got_onehot, # 已收集的宝箱编号，one-hot 编码
             np.array([float(self.current_steps / Config.MAX_STEP_NO)], dtype=np.float32), # 整数转浮点
             self.agent_pos_norm, # 已经是 np.float32 数组

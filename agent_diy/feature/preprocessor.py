@@ -134,8 +134,8 @@ class Preprocessor:
             
             elif organ["sub_type"] == 1: # 如果是宝箱
                 if organ["status"] == 0: # 已被获取（空宝箱）
-                    if orgain["config_id"] not in self.treasures_got:
-                        self.treasures_got.append(orgain["config_id"])
+                    if organ["config_id"] not in self.treasures_got:
+                        self.treasures_got.append(organ["config_id"])
                         self.is_getting_treasure = True
                     continue
                 
@@ -202,14 +202,13 @@ class Preprocessor:
         # 宝箱获得情况
         treasures_got_onehot = np.zeros(8, dtype=np.float32)
         for treasure_id in self.treasures_got:
-            if 0 <= treasure_id < 8:
-                treasures_got_onehot[treasure_id] = 1.0
+            if 0 < treasure_id <= 8:
+                treasures_got_onehot[treasure_id - 1] = 1.0
 
         # Feature (确保所有元素都是 float32 类型的 NumPy 数组或标量)
         feature_list = [
             vision_flat,
             np.array([float(self.can_flash)], dtype=np.float32), # 布尔值转浮点
-            np.array([float(len(self.treasures_got))], dtype=np.float32), # 整数转浮点
             treasures_got_onehot, # 已收集的宝箱编号，one-hot 编码
             np.array([float(self.current_steps / Config.MAX_STEP_NO)], dtype=np.float32), # 整数转浮点
             self.agent_pos_norm, # 已经是 np.float32 数组
@@ -238,7 +237,7 @@ class Preprocessor:
             current_dist_to_end=self.current_dist_to_end,
             prev_dist_to_end=self.prev_dist_to_end,
             current_steps=self.current_steps,
-            is_terminal=((self.agent_pos == self.end_pos) or truncated == True or prev_pos is None), # 防止第一轮的reward被计算成 -inf
+            is_terminal=((self.agent_pos == self.end_pos) or truncated == True or self.prev_pos is None), # 防止第一轮的reward被计算成 -inf
             is_bad_action=(self.last_action in self.bad_move_ids),
             is_flash_used=(self.last_action > 7),
             is_getting_treasure=self.is_getting_treasure

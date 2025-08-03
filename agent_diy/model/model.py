@@ -99,7 +99,7 @@ class Model(nn.Module):
 
         # --- 辅助特征处理流 (Auxiliary FC Stream) ---
         self.aux_mlp = MLP(
-            [self.n_aux_features, 64], # 输入9维，映射到64维
+            [self.n_aux_features, 64], # 输入16维，映射到64维
             "aux_mlp",
             non_linearity_last=False # 辅助流的最后一层也可以有激活函数，具体看效果
         )

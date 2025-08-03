@@ -104,14 +104,12 @@ def reward_process(raw_reward, collected_treasures_count , agent_pos, prev_pos, 
     Returns:
         list [float]: 经过塑形处理后的最终奖励。
     """
-    # 0. 已获得宝箱的奖励和当前帧的奖励
-    if is_getting_treasure: # 不和 raw_reward 重复算宝箱奖励
-        collected_treasures_count -= 2
+    # 0. 已获得宝箱的奖励
     processed_reward = collected_treasures_count * Config.REWARD_TREASURE_BONUS
-    processed_reward += raw_reward * Config.REWARD_SCALE_TERMINAL
 
     # 1. 最终奖励处理 (如果回合结束，对原始奖励进行缩放)
     if is_terminal:
+        processed_reward += raw_reward * Config.REWARD_SCALE_TERMINAL
         return [processed_reward]
 
     # 2. 时间惩罚和低效行动惩罚
@@ -143,7 +141,7 @@ def reward_process(raw_reward, collected_treasures_count , agent_pos, prev_pos, 
             current_dist_to_end = calculate_distance(agent_pos, end_pos)
             if prev_dist_to_end is not None:
                 distance_change_end = prev_dist_to_end - current_dist_to_end
-                processed_reward += distance_change_end * Config.REWARD_SCALE_END_DIST
+                processed_reward += distance_change_end * Config.REWARD_SCALE_END_DIST * time_penalty_factor
     
     return [processed_reward]
 

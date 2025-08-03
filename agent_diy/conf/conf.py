@@ -23,7 +23,7 @@ class Config:
     LOCAL_GRID_FLAT_DIM = LOCAL_GRID_HEIGHT * LOCAL_GRID_WIDTH * LOCAL_GRID_CHANNELS
 
     # --- 辅助特征维度 ---
-    NUM_AUX_FEATURES = 9
+    NUM_AUX_FEATURES = 16
 
     # features: 现在 FEATURES 列表用来表示新观测中各个部分的维度
     # 注意: 这里我们将 FEATURES 定义为包含两个主要部分的维度
@@ -96,19 +96,19 @@ class Config:
 
     # 2. 核心奖励信号
     # 每收集一个宝箱，给予的额外奖励。这个奖励是持续的，每一步都会得到
-    REWARD_TREASURE_BONUS = 0.5
+    REWARD_TREASURE_BONUS = 0.2
     # 靠近宝箱的距离奖励，应该略高于终点奖励，以鼓励前期探索
     REWARD_SCALE_TREASURE_DIST = 0.05
-    # 靠近终点的距离奖励，在后期权重会增加
-    REWARD_SCALE_END_DIST = 0.02
+    # 靠近终点的距离奖励，会乘上一个小于1的权重
+    REWARD_SCALE_END_DIST = 0.1
 
     # 3. 动作奖励与惩罚
-    # 闪现奖励，比普通移动略高，鼓励高效利用
-    REWARD_SCALE_FLASH_DIST = 0.08
+    # 闪现奖励，比普通移动略低，避免刷分
+    REWARD_SCALE_FLASH_DIST = 0.03
     # 乱用闪现的惩罚要大，让模型学会谨慎使用
     REWARD_PENALTY_BAD_FLASH = 0.5
     # 每一步的时间惩罚，用于鼓励智能体快速行动，不要在原地徘徊
-    REWARD_TIME_PENALTY = 5
+    REWARD_TIME_PENALTY = 0.05
     # 低效行动的惩罚，鼓励智能体采取更有效的行动
     REWARD_BAD_ACTION_PENALTY = 0.04
     

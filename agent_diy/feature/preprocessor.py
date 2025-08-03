@@ -178,8 +178,7 @@ class Preprocessor:
                         self.vision[3][r, c] = 1.0 # 终点通道
                         self.vision[0][r, c] = 1.0 # 正常道路通道
                     elif value == 4: # 宝箱坐标
-                        if (r, c) not in self.treasures_got:
-                            self.vision[2][r, c] = 1.0 # 宝箱通道
+                        self.vision[2][r, c] = 1.0 # 宝箱通道
                         self.vision[0][r, c] = 1.0 # 正常道路通道
                     else: # 加速增益坐标 (假设 value == 6 或其他值)
                         self.vision[4][r, c] = 1.0 # 加速增益通道
@@ -239,7 +238,7 @@ class Preprocessor:
             current_dist_to_end=self.current_dist_to_end,
             prev_dist_to_end=self.prev_dist_to_end,
             current_steps=self.current_steps,
-            is_terminal=((self.agent_pos == self.end_pos) or truncated == True),
+            is_terminal=((self.agent_pos == self.end_pos) or truncated == True or prev_pos is None), # 防止第一轮的reward被计算成 -inf
             is_bad_action=(self.last_action in self.bad_move_ids),
             is_flash_used=(self.last_action > 7),
             is_getting_treasure=self.is_getting_treasure

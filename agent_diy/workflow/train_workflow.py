@@ -11,7 +11,6 @@ Author: Tencent AI Arena Authors
 import time
 import os
 from kaiwu_agent.utils.common_func import Frame, attached
-from agent_diy.feature.definition import ReplayBuffer
 from tools.train_env_conf_validate import read_usr_conf
 from agent_diy.feature.definition import (
     sample_process,
@@ -34,27 +33,10 @@ def workflow(envs, agents, logger=None, monitor=None):
             logger.error(f"usr_conf is None, please check agent_diy/conf/train_env_conf.toml")
             return
 
-        replay_buffer = ReplayBuffer(Config.REPLAY_BUFFER_SIZE) # 假设 Config 中有 REPLAY_BUFFER_SIZE
-        # 预训练步数 (Pre-fill steps): 在开始学习前，先填充 Replay Buffer 到一定容量
-        logger.info(f"Starting to pre-fill replay buffer up to {Config.REPLAY_BUFFER_MIN_SIZE} experiences...")
-        while replay_buffer.size() < Config.REPLAY_BUFFER_MIN_SIZE:
-            for g_data, _ in run_episodes(1, env, agent, usr_conf, logger, monitor):
-                for sample in g_data:
-                    replay_buffer.add(sample)
-        logger.info(f"Replay buffer pre-filled with {replay_buffer.size()} experiences. Starting training.")
-
         while True:
             for g_data, monitor_data in run_episodes(episode_num_every_epoch, env, agent, usr_conf, logger, monitor):
-                # 传入 replay_buffer
-                for samples in g_data:
-                    replay_buffer.add(samples)
-                if replay_buffer.size() >= Config.REPLAY_BUFFER_MIN_SIZE:
-                    for _ in range(Config.TRAIN_ITERATIONS_PER_EPISODE): # 假设每个回合训练多次
-                        if replay_buffer.size() < Config.BATCH_SIZE: # 防止 batch size 大于 buffer size
-                            break
-                        
-                        sampled_batch = replay_buffer.sample(Config.BATCH_SIZE)
-                        agent.learn(sampled_batch)
+                agent.learn(g_data)
+                g_data.clear()
 
             # Save model file
             # 保存model文件

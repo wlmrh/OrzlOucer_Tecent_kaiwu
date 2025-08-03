@@ -76,20 +76,6 @@ DirectionAngles = {
     8: 315,
 }
 
-class ReplayBuffer:
-    def __init__(self, capacity):
-        self.buffer = collections.deque(maxlen=capacity)
-
-    def add(self, sample_data):
-        self.buffer.append(sample_data)
-
-    def sample(self, batch_size):
-        transitions = random.sample(self.buffer, batch_size)
-        return transitions
-
-    def size(self):  # 目前buffer中数据的数量
-        return len(self.buffer)
-
 def calculate_distance(pos1, pos2):
     if pos1 is None or pos2 is None:
         return None
@@ -120,7 +106,7 @@ def reward_process(raw_reward, collected_treasures_count , agent_pos, prev_pos, 
     """
     # 0. 已获得宝箱的奖励和当前帧的奖励
     if is_getting_treasure: # 不和 raw_reward 重复算宝箱奖励
-        collected_treasures_count -= 1
+        collected_treasures_count -= 2
     processed_reward = collected_treasures_count * Config.REWARD_TREASURE_BONUS
     processed_reward += raw_reward * Config.REWARD_SCALE_TERMINAL
 
@@ -129,15 +115,14 @@ def reward_process(raw_reward, collected_treasures_count , agent_pos, prev_pos, 
         return [processed_reward]
 
     # 2. 时间惩罚和低效行动惩罚
-    time_penalty = Config.REWARD_TIME_PENALTY * (current_steps / Config.MAX_STEP_NO) ** 2
+    time_penalty = Config.REWARD_TIME_PENALTY
     processed_reward -= time_penalty
     if is_bad_action:
         processed_reward -= Config.REWARD_BAD_ACTION_PENALTY
-    
-    # 引入动态权重，让模型对时间有感知
-    end_weight_factor = current_steps / Config.MAX_STEP_NO
-    treasure_weight_factor = 1 - end_weight_factor
-    
+
+    # 终点距离的动态权重
+    end_distance_parameter = 1.0 / (1.1 - (current_steps / Config.MAX_STEP_NO))
+    processed_reward -= calculate_distance(agent_pos, end_pos) / 128 * end_distance_parameter
     # 3. 闪现奖励：只有当智能体使用了闪现时才计算
     if is_flash_used:
         # 闪现的奖励也需要考虑动态权重
@@ -147,21 +132,21 @@ def reward_process(raw_reward, collected_treasures_count , agent_pos, prev_pos, 
             dist_change_end = calculate_distance(prev_pos, end_pos) - calculate_distance(agent_pos, end_pos)
 
             # 闪现奖励是两个目标的加权奖励之和
-            processed_reward += dist_change_treasure * Config.REWARD_SCALE_FLASH_DIST * treasure_weight_factor
-            processed_reward += dist_change_end * Config.REWARD_SCALE_FLASH_DIST * end_weight_factor
+            processed_reward += dist_change_treasure * Config.REWARD_SCALE_FLASH_DIST
+            processed_reward += dist_change_end * Config.REWARD_SCALE_FLASH_DIST * end_distance_parameter
             
     # 4. 普通移动奖励：当没有使用闪现时才计算
     else:
         if nearest_treasure_pos is not None:
             if prev_dist_to_treasure is not None:
                 distance_change_treasure = prev_dist_to_treasure - current_dist_to_treasure
-                processed_reward += distance_change_treasure * Config.REWARD_SCALE_TREASURE_DIST * treasure_weight_factor
+                processed_reward += distance_change_treasure * Config.REWARD_SCALE_TREASURE_DIST
         
         if end_pos is not None:
             current_dist_to_end = calculate_distance(agent_pos, end_pos)
             if prev_dist_to_end is not None:
                 distance_change_end = prev_dist_to_end - current_dist_to_end
-                processed_reward += distance_change_end * Config.REWARD_SCALE_END_DIST * end_weight_factor
+                processed_reward += distance_change_end * Config.REWARD_SCALE_END_DIST * end_distance_parameter
     
     return [processed_reward]
 

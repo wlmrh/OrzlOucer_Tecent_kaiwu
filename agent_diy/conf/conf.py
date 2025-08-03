@@ -23,7 +23,7 @@ class Config:
     LOCAL_GRID_FLAT_DIM = LOCAL_GRID_HEIGHT * LOCAL_GRID_WIDTH * LOCAL_GRID_CHANNELS
 
     # --- 辅助特征维度 ---
-    NUM_AUX_FEATURES = 9
+    NUM_AUX_FEATURES = 16
 
     # features: 现在 FEATURES 列表用来表示新观测中各个部分的维度
     # 注意: 这里我们将 FEATURES 定义为包含两个主要部分的维度

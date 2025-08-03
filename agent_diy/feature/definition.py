@@ -79,7 +79,7 @@ DirectionAngles = {
 def calculate_distance(pos1, pos2):
     if pos1 is None or pos2 is None:
         return None
-    return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
+    return math.hypot(pos1[0] - pos2[0], pos1[1] - pos2[1])
 
 def reward_process(raw_reward, collected_treasures_count , agent_pos, prev_pos, nearest_treasure_pos, end_pos,
                 current_dist_to_treasure, prev_dist_to_treasure, current_dist_to_end, prev_dist_to_end, 
@@ -115,13 +115,11 @@ def reward_process(raw_reward, collected_treasures_count , agent_pos, prev_pos, 
         return [processed_reward]
 
     # 2. 时间惩罚和低效行动惩罚
-    processed_reward -= Config.REWARD_TIME_PENALTY
     if is_bad_action:
         processed_reward -= Config.REWARD_BAD_ACTION_PENALTY
 
-    # 终点距离的动态权重
-    end_distance_parameter = 1.0 / (1.1 - (current_steps / Config.MAX_STEP_NO))
-    processed_reward -= calculate_distance(agent_pos, end_pos) / 128 * end_distance_parameter
+    time_penalty_factor = (current_steps / Config.MAX_STEP_NO) ** 2  # 指数增长
+    processed_reward -= Config.REWARD_TIME_PENALTY * time_penalty_factor
     # 3. 闪现奖励：只有当智能体使用了闪现时才计算
     if is_flash_used:
         # 闪现的奖励也需要考虑动态权重
@@ -132,7 +130,7 @@ def reward_process(raw_reward, collected_treasures_count , agent_pos, prev_pos, 
 
             # 闪现奖励是两个目标的加权奖励之和
             processed_reward += dist_change_treasure * Config.REWARD_SCALE_FLASH_DIST
-            processed_reward += dist_change_end * Config.REWARD_SCALE_FLASH_DIST * end_distance_parameter
+            processed_reward += dist_change_end * Config.REWARD_SCALE_FLASH_DIST
             
     # 4. 普通移动奖励：当没有使用闪现时才计算
     else:
@@ -145,7 +143,7 @@ def reward_process(raw_reward, collected_treasures_count , agent_pos, prev_pos, 
             current_dist_to_end = calculate_distance(agent_pos, end_pos)
             if prev_dist_to_end is not None:
                 distance_change_end = prev_dist_to_end - current_dist_to_end
-                processed_reward += distance_change_end * Config.REWARD_SCALE_END_DIST * end_distance_parameter
+                processed_reward += distance_change_end * Config.REWARD_SCALE_END_DIST
     
     return [processed_reward]
 

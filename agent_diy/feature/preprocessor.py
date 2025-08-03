@@ -47,7 +47,6 @@ class Preprocessor:
         self.prev_dist_to_end = float("inf") # 上一帧到终点的距离
         self.bad_move_ids = set() # 记录非法操作
         self.can_flash = True # 闪现是否可用
-        self.is_bad_action = False # 是否是坏操作
 
         self.nearest_treasure_pos = None # 最近宝箱坐标
         self.nearest_treasure_pos_norm = None # 归一化最近宝箱坐标
@@ -76,13 +75,6 @@ class Preprocessor:
         return delta_x, delta_z
 
     def pb2struct(self, frame_state, last_action):
-        if (self.vision[1][5, 6] == 1.0 or self.vision[1][5, 4] == 1.0 or self.vision[1][4, 5] == 1.0
-        or self.vision[1][6, 5] == 1.0 or self.vision[1][6, 6] == 1.0 or self.vision[1][4, 4] == 1.0
-        or self.vision[1][4, 6] == 1.0 or self.vision[1][6, 4] == 1.0):
-            self.is_bad_action = True
-        else:
-            self.is_bad_action = False
-
         # 如果有障碍物，则不允许闪现
         self.can_flash = False
 
@@ -142,7 +134,7 @@ class Preprocessor:
             
             elif organ["sub_type"] == 1: # 如果是宝箱
                 if organ["status"] == 0: # 已被获取（空宝箱）
-                    if organ["pos"]["x"] == self.agent_pos[0] and organ["pos"]["z"] == self.agent_pos[1]:
+                    if (organ["pos"]["x"], organ["pos"]["z"]) not in self.treasures_got:
                         self.treasures_got.append(self.agent_pos)
                         self.is_getting_treasure = True
                     continue
@@ -173,6 +165,7 @@ class Preprocessor:
         for i in range(5):
             self.vision[i].fill(0) # 将所有元素设为0
 
+        # 0表示不可通行，1表示可以通行，2表示起点位置，3表示终点位置，4表示宝箱位置，6表示加速增益位置。
         for r, row_data in enumerate(obs["map_info"]):
             for c, value in enumerate(row_data['values']):
                 # 确保 r, c 在 11x11 范围内
@@ -183,13 +176,14 @@ class Preprocessor:
                         self.vision[0][r, c] = 1.0 # 正常道路通道
                     elif value == 3: # 终点坐标
                         self.vision[3][r, c] = 1.0 # 终点通道
+                        self.vision[0][r, c] = 1.0 # 正常道路通道
                     elif value == 4: # 宝箱坐标
                         if (r, c) not in self.treasures_got:
                             self.vision[2][r, c] = 1.0 # 宝箱通道
-                        else:
-                            self.vision[0][r, c] = 1.0 # 正常道路通道
+                        self.vision[0][r, c] = 1.0 # 正常道路通道
                     else: # 加速增益坐标 (假设 value == 6 或其他值)
                         self.vision[4][r, c] = 1.0 # 加速增益通道
+                        self.vision[0][r, c] = 1.0 # 正常道路通道
 
         self.last_action = last_action
 

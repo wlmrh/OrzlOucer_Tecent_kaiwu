@@ -83,7 +83,7 @@ def calculate_distance(pos1, pos2):
 
 def reward_process(raw_reward, collected_treasures_count , agent_pos, prev_pos,
                    nearest_treasure_pos, end_pos, current_dist_to_treasure, prev_dist_to_treasure, 
-                   current_dist_to_end, prev_dist_to_end, current_steps, visit_count,
+                   current_dist_to_end, prev_dist_to_end, current_steps, visit_count, cross_obstacles,
                    is_terminal, is_bad_action, is_flash_used=False, is_getting_treasure=False):
     """
     Args:
@@ -99,6 +99,7 @@ def reward_process(raw_reward, collected_treasures_count , agent_pos, prev_pos,
         prev_dist_to_end (float/None): 上一帧智能体到终点的距离。
         current_steps (int): 当前游戏步数。
         visit_count (int): 当前坐标的访问计数。
+        cross_obstacles (int): 闪现穿越的障碍物数量。
         is_terminal (bool): 当前步是否是回合终止。
         is_bad_action (bool): 当前步是否是坏行为。
         is_flash_used (bool): 闪现是否可用。
@@ -125,6 +126,7 @@ def reward_process(raw_reward, collected_treasures_count , agent_pos, prev_pos,
     
     # 3. 闪现奖励：只有当智能体使用了闪现时才计算
     if is_flash_used:
+        processed_reward += Config.REWARD_GOOD_FLASH * cross_obstacles  # 闪现穿越障碍物的奖励
         # 闪现的奖励也需要考虑动态权重
         if nearest_treasure_pos is not None and end_pos is not None:
             # 计算到宝箱和终点的距离变化

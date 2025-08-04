@@ -47,6 +47,11 @@ class Preprocessor:
         self.prev_dist_to_end = float("inf") # 上一帧到终点的距离
         self.bad_move_ids = set() # 记录非法操作
         self.can_flash = True # 闪现是否可用
+        self.flash_direct = [
+            (10, 5), (10, 10), (5, 10), (0, 10), 
+            (0, 5), (0, 0), (5, 0), (10, 0)
+        ]
+        self.cross_obstacles = 0 # 闪现穿越的障碍物数量
 
         self.nearest_treasure_pos = None # 最近宝箱坐标
         self.nearest_treasure_pos_norm = None # 归一化最近宝箱坐标
@@ -70,6 +75,48 @@ class Preprocessor:
         # 记录每个地方到过的次数
         self.visit_count = np.zeros((128, 128), dtype=np.int32) # 128x128 的访问计数矩阵
 
+    def count_obstacles(vision_map, start_pos, end_pos):
+    """
+    计算从起点到终点直线路径上的障碍物数量。
+    这里使用一个简单的线性插值方法来模拟直线路径。
+
+    Args:
+        vision_map (np.ndarray): 11x11 的视野地图，1 为障碍物，0 为可通行。
+        start_pos (tuple): 起点坐标 (r, c)，通常是 (5, 5)。
+        end_pos (tuple): 终点坐标 (r, c)。
+
+    Returns:
+        int: 路径上的障碍物数量。
+    """
+    obstacle_count = 0
+    start_r, start_c = start_pos
+    end_r, end_c = end_pos
+
+    # 计算 r 和 c 方向上的步长
+    dr = end_r - start_r
+    dc = end_c - start_c
+    
+    # 路径上的总步数
+    steps = max(abs(dr), abs(dc))
+
+    if steps == 0:
+        return 0
+
+    # 沿直线路径迭代
+    for i in range(1, steps + 1):
+        r = start_r + dr * i / steps
+        c = start_c + dc * i / steps
+        
+        # 将浮点坐标四舍五入为整数，检查该位置是否为障碍物
+        # 确保坐标在地图范围内
+        if 0 <= round(r) < 11 and 0 <= round(c) < 11:
+            if vision_map[round(r), round(c)] == 1:
+                obstacle_count += 1
+    if vision_map[end_pos] == 1:
+        obstacle_count = 0 # 必须确保闪现有效才给奖励
+    return obstacle_count
+
+
     def get_approx_loc(self, pos_dis, pos_dir): # 根据相对大致方位，大致距离，来计算物件的大致相对坐标
         distance = pos_dis * 20
         theta = DirectionAngles[pos_dir]
@@ -78,7 +125,6 @@ class Preprocessor:
         return delta_x, delta_z
 
     def pb2struct(self, frame_state, last_action):
-        # 如果有障碍物，则不允许闪现
         self.can_flash = False
 
         obs, _ = frame_state
@@ -88,6 +134,13 @@ class Preprocessor:
         self.prev_pos = self.agent_pos
         self.prev_dist_to_treasure = self.current_dist_to_treasure
         self.prev_dist_to_end = self.current_dist_to_end
+
+        if last_action > 7: # 如果是闪现
+            self.cross_obstacles = self.count_obstacles(
+                self.vision[1], 
+                (5, 5), # 起点坐标通常是 (5, 5)
+                self.flash_direct[last_action - 8] # last_action - 8 是闪现的方向
+            )
 
         # 计算本帧的信息
         hero = obs["frame_state"]["heroes"][0]
@@ -242,6 +295,7 @@ class Preprocessor:
             prev_dist_to_end=self.prev_dist_to_end,
             current_steps=self.current_steps,
             visit_count=self.visit_count[self.agent_pos[0], self.agent_pos[1]], # 当前坐标的访问计数
+            cross_obstacles=self.cross_obstacles, # 闪现穿越的障碍物数量
             is_terminal=((self.agent_pos == self.end_pos) or truncated == True or self.prev_pos is None), # 防止第一轮的reward被计算成 -inf
             is_bad_action=(self.last_action in self.bad_move_ids),
             is_flash_used=(self.last_action > 7),

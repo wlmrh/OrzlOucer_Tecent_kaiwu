@@ -81,9 +81,10 @@ def calculate_distance(pos1, pos2):
         return None
     return math.hypot(pos1[0] - pos2[0], pos1[1] - pos2[1])
 
-def reward_process(raw_reward, collected_treasures_count , agent_pos, prev_pos, nearest_treasure_pos, end_pos,
-                current_dist_to_treasure, prev_dist_to_treasure, current_dist_to_end, prev_dist_to_end, 
-                current_steps, is_terminal, is_bad_action, is_flash_used=False, is_getting_treasure=False):
+def reward_process(raw_reward, collected_treasures_count , agent_pos, prev_pos,
+                   nearest_treasure_pos, end_pos, current_dist_to_treasure, prev_dist_to_treasure, 
+                   current_dist_to_end, prev_dist_to_end, current_steps, is_terminal, is_bad_action,
+                    is_flash_used=False, is_getting_treasure=False):
     """
     Args:
         raw_reward (float): 环境返回的原始奖励。
@@ -116,8 +117,11 @@ def reward_process(raw_reward, collected_treasures_count , agent_pos, prev_pos, 
     if is_bad_action:
         processed_reward -= Config.REWARD_BAD_ACTION_PENALTY
 
+    processed_reward -= Config.REWARD_TIME_PENALTY
+
+    # 动态调整时间惩罚的权重，随着步数增加，时间惩罚逐渐增大
     time_penalty_factor = (current_steps / Config.MAX_STEP_NO) ** 2  # 指数增长
-    processed_reward -= Config.REWARD_TIME_PENALTY * time_penalty_factor
+    
     # 3. 闪现奖励：只有当智能体使用了闪现时才计算
     if is_flash_used:
         # 闪现的奖励也需要考虑动态权重

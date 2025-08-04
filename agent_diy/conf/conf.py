@@ -100,7 +100,7 @@ class Config:
     # 靠近宝箱的距离奖励，应该略高于终点奖励，以鼓励前期探索
     REWARD_SCALE_TREASURE_DIST = 0.05
     # 靠近终点的距离奖励，会乘上一个小于1的权重
-    REWARD_SCALE_END_DIST = 0.1
+    REWARD_SCALE_END_DIST = 1
 
     # 3. 动作奖励与惩罚
     # 闪现奖励，比普通移动略低，避免刷分

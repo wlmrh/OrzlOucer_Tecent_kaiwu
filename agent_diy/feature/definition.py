@@ -146,9 +146,7 @@ def reward_process(raw_reward, collected_treasures_count , agent_pos, prev_pos,
         
         if end_pos is not None:
             current_dist_to_end = calculate_distance(agent_pos, end_pos)
-            if prev_dist_to_end is not None:
-                distance_change_end = prev_dist_to_end - current_dist_to_end
-                processed_reward += distance_change_end * Config.REWARD_SCALE_END_DIST * time_penalty_factor
+                processed_reward -= current_dist_to_end / 128 * Config.REWARD_SCALE_END_DIST * time_penalty_factor
     
     return [processed_reward]
 

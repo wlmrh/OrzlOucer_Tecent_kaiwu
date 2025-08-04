@@ -83,8 +83,8 @@ def calculate_distance(pos1, pos2):
 
 def reward_process(raw_reward, collected_treasures_count , agent_pos, prev_pos,
                    nearest_treasure_pos, end_pos, current_dist_to_treasure, prev_dist_to_treasure, 
-                   current_dist_to_end, prev_dist_to_end, current_steps, is_terminal, is_bad_action,
-                    is_flash_used=False, is_getting_treasure=False):
+                   current_dist_to_end, prev_dist_to_end, current_steps, visit_count,
+                   is_terminal, is_bad_action, is_flash_used=False, is_getting_treasure=False):
     """
     Args:
         raw_reward (float): 环境返回的原始奖励。
@@ -98,6 +98,7 @@ def reward_process(raw_reward, collected_treasures_count , agent_pos, prev_pos,
         current_dist_to_end (float/None): 智能体到终点的距离。
         prev_dist_to_end (float/None): 上一帧智能体到终点的距离。
         current_steps (int): 当前游戏步数。
+        visit_count (int): 当前坐标的访问计数。
         is_terminal (bool): 当前步是否是回合终止。
         is_bad_action (bool): 当前步是否是坏行为。
         is_flash_used (bool): 闪现是否可用。
@@ -114,10 +115,10 @@ def reward_process(raw_reward, collected_treasures_count , agent_pos, prev_pos,
         return [processed_reward]
 
     # 2. 时间惩罚和低效行动惩罚
+    processed_reward -= Config.REWARD_TIME_PENALTY
+    processed_reward -= visit_count * Config.REPEAT_VISIT_PENALTY  # 访问次数越多，惩罚越大
     if is_bad_action:
         processed_reward -= Config.REWARD_BAD_ACTION_PENALTY
-
-    processed_reward -= Config.REWARD_TIME_PENALTY
 
     # 动态调整时间惩罚的权重，随着步数增加，时间惩罚逐渐增大
     time_penalty_factor = (current_steps / Config.MAX_STEP_NO) ** 2  # 指数增长

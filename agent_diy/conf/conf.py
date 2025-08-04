@@ -111,8 +111,8 @@ class Config:
     REWARD_TIME_PENALTY = 0.05
     # 低效行动的惩罚，鼓励智能体采取更有效的行动
     REWARD_BAD_ACTION_PENALTY = 0.05
-    # 探索奖励
-    REWARD_DISCOVERY = 0.01
+    # 访问次数惩罚，鼓励智能体探索新区域
+    REPEAT_VISIT_PENALTY = 0.05
     
     # 内存池相关参数
     REPLAY_BUFFER_SIZE = 30000     # 内存池最大容量

@@ -67,6 +67,9 @@ class Preprocessor:
         self.last_pos_norm = None
         self.last_action = -1 # 上一帧的动作
 
+        # 记录每个地方到过的次数
+        self.visit_count = np.zeros((128, 128), dtype=np.int32) # 128x128 的访问计数矩阵
+
     def get_approx_loc(self, pos_dis, pos_dir): # 根据相对大致方位，大致距离，来计算物件的大致相对坐标
         distance = pos_dis * 20
         theta = DirectionAngles[pos_dir]
@@ -89,6 +92,7 @@ class Preprocessor:
         # 计算本帧的信息
         hero = obs["frame_state"]["heroes"][0]
         self.agent_pos = (hero["pos"]["x"], hero["pos"]["z"])
+        self.visit_count[self.agent_pos[0], self.agent_pos[1]] += 1 # 更新访问计数
         self.last_pos_norm = self.agent_pos_norm
         self.agent_pos_norm = norm(self.agent_pos, self.map_size, 0)
 
@@ -237,6 +241,7 @@ class Preprocessor:
             current_dist_to_end=self.current_dist_to_end,
             prev_dist_to_end=self.prev_dist_to_end,
             current_steps=self.current_steps,
+            visit_count=self.visit_count[self.agent_pos[0], self.agent_pos[1]], # 当前坐标的访问计数
             is_terminal=((self.agent_pos == self.end_pos) or truncated == True or self.prev_pos is None), # 防止第一轮的reward被计算成 -inf
             is_bad_action=(self.last_action in self.bad_move_ids),
             is_flash_used=(self.last_action > 7),

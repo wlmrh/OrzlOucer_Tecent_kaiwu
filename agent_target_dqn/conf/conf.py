@@ -12,16 +12,14 @@ Author: Tencent AI Arena Authors
 # The last few configurations in the file are for the Kaiwu platform to use and should not be changed.
 # 配置，包含维度设置，算法参数设置，文件的最后一些配置是开悟平台使用不要改动
 class Config:
-    ACTION_LEN = 1
-    ACTION_NUM = 16
+
     # features
     # 特征
     FEATURES = [
-        2, # 归一化后的当前位置
-        6, # 归一化终点位置相对于当前位置的特征(是否被发现、相对方向角的 cos、相对方向角的 sin、归一化的终点x坐标、归一化的终点y坐标)
-        6, # 归一化10步前的位置相对于当前位置特征(是否被发现、相对方向角的 cos、相对方向角的 sin、归一化的终点x坐标、归一化的终点y坐标)
-        8 + 8, # 每种动作是否合法(8 个移动操作、8个闪现操作)
-        1 # 到墙的距离
+        2,
+        6,
+        6,
+        8,
     ]
 
     FEATURE_SPLIT_SHAPE = FEATURES
@@ -32,11 +30,11 @@ class Config:
 
     # Dimension of movement action direction
     # 移动动作方向的维度
-    DIM_OF_ACTION_DIRECTION = 16
+    DIM_OF_ACTION_DIRECTION = 8
 
     # Dimension of flash action direction
     # 闪现动作方向的维度
-    DIM_OF_TALENT = 0
+    DIM_OF_TALENT = 8
 
     # Input dimension of reverb sample on learner. Note that different algorithms have different dimensions.
     # **Note**, this item must be configured correctly and should be aligned with the NumpyData2SampleData function data in definition.py

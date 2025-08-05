@@ -23,7 +23,7 @@ from tools.metrics_utils import get_training_metrics
 def workflow(envs, agents, logger=None, monitor=None):
     try:
         env, agent = envs[0], agents[0]
-        episode_num_every_epoch = 1 # 每个训练周期中的游戏轮数
+        episode_num_every_epoch = 1
         last_save_model_time = 0
         last_put_data_time = 0
         monitor_data = {}
@@ -35,7 +35,6 @@ def workflow(envs, agents, logger=None, monitor=None):
             logger.error(f"usr_conf is None, please check agent_dqn/conf/train_env_conf.toml")
             return
 
-        # 交互 - 更新参数(learn) - 保存模型和上报监控指标
         while True:
             for g_data, monitor_data in run_episodes(episode_num_every_epoch, env, agent, usr_conf, logger, monitor):
                 agent.learn(g_data)

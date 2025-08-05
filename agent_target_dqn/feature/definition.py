@@ -73,46 +73,21 @@ DirectionAngles = {
     8: 315,
 }
 
-class ReplayBuffer:
-    def __init__(self, capacity):
-        self.buffer = collections.deque(maxlen=capacity)
 
-    def add(self, sample_data):
-        self.buffer.append(sample_data)
-
-    def sample(self, batch_size):
-        transitions = random.sample(self.buffer, batch_size)
-        return transitions
-
-    def size(self):  # 目前buffer中数据的数量
-        return len(self.buffer)
-
-def reward_process(end_dist, history_dist, discovery, discovery_pri, wall_dis, about_to_end):
+def reward_process(end_dist, history_dist):
     # step reward
     # 步数奖励
     step_reward = -0.001
 
     # end reward
     # 终点奖励
-    end_reward = 0.0
-    if about_to_end:
-        end_reward = 0.02 / end_dist
+    end_reward = -0.02 * end_dist
 
     # distance reward
     # 距离奖励
     dist_reward = min(0.001, 0.05 * history_dist)
 
-    # discovery reward
-    # 探索奖励
-    discovery_reward = 0.001 * discovery * discovery_pri[0]
-    discovery_pri[0] = max(1.0, discovery_pri[0] - 0.05)
-    if dist_reward == 0.001:
-        discovery_pri[0] = 2.0
-
-    # 远离墙的奖励
-    wall_reward = wall_dis * 2
-
-    return [step_reward + dist_reward + end_reward + discovery_reward + wall_reward]
+    return [step_reward + dist_reward + end_reward]
 
 
 @attached

@@ -8,14 +8,12 @@ Author: Tencent AI Arena Authors
 """
 
 
+from kaiwu_agent.utils.common_func import create_cls, attached
 import numpy as np
-import collections
-import random
-from kaiwu_agent.utils.common_func import attached, create_cls
-from agent_diy.conf.conf import Config
 
-# The create_cls function is used to dynamically create a class. The first parameter of the function is the type name,
-# and the remaining parameters are the attributes of the class, which should have a default value of None.
+# The create_cls function is used to dynamically create a class.
+# The first parameter of the function is the type name, and the remaining parameters are the attributes of the class.
+# The default value of the attribute should be set to None.
 # create_cls函数用于动态创建一个类，函数第一个参数为类型名称，剩余参数为类的属性，属性默认值应设为None
 ObsData = create_cls(
     "ObsData",
@@ -43,190 +41,22 @@ SampleData = create_cls(
     done=None,
 )
 
-RelativeDistance = {
-    "RELATIVE_DISTANCE_NONE": 0,
-    "VerySmall": 1,
-    "Small": 2,
-    "Medium": 3,
-    "Large": 4,
-    "VeryLarge": 5,
-}
 
+def reward_shaping(step_no, score, terminated, truncated, remain_info, _remain_info, state_env_info, _state_env_info):
+    pass
 
-RelativeDirection = {
-    "East": 1,
-    "NorthEast": 2,
-    "North": 3,
-    "NorthWest": 4,
-    "West": 5,
-    "SouthWest": 6,
-    "South": 7,
-    "SouthEast": 8,
-}
-
-DirectionAngles = {
-    1: 0,
-    2: 45,
-    3: 90,
-    4: 135,
-    5: 180,
-    6: 225,
-    7: 270,
-    8: 315,
-}
-
-def calculate_distance(pos1, pos2):
-    if pos1 is None or pos2 is None:
-        return None
-    return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
-
-def reward_process(raw_reward, collected_treasures_count , agent_pos, prev_pos,
-                   nearest_treasure_pos, end_pos, current_dist_to_treasure, prev_dist_to_treasure, 
-                   current_dist_to_end, prev_dist_to_end, current_steps, visit_count, cross_obstacles,
-                   is_terminal, is_bad_action, is_flash_used=False, is_getting_treasure=False):
-    """
-    Args:
-        raw_reward (float): 环境返回的原始奖励。
-        collected_treasures_count (int): 已获得的宝箱数
-        agent_pos (tuple): 智能体当前 (x, z) 坐标。
-        prev_pos (tuple): 智能体上一帧 (x, z) 坐标。
-        nearest_treasure_pos (tuple/None): 最近宝箱的 (x, z) 坐标或 None。
-        end_pos (tuple/None): 终点的 (x, z) 坐标或 None。
-        current_dist_to_treasure (float/None): 智能体到最近宝箱的距离。
-        prev_dist_to_treasure (float/None): 上一帧智能体到最近宝箱的距离。
-        current_dist_to_end (float/None): 智能体到终点的距离。
-        prev_dist_to_end (float/None): 上一帧智能体到终点的距离。
-        current_steps (int): 当前游戏步数。
-        visit_count (int): 当前坐标的访问计数。
-        cross_obstacles (int): 闪现穿越的障碍物数量。
-        is_terminal (bool): 当前步是否是回合终止。
-        is_bad_action (bool): 当前步是否是坏行为。
-        is_flash_used (bool): 闪现是否可用。
-        is_getting_treasure (bool): 当前帧是否获得宝箱。
-    Returns:
-        list [float]: 经过塑形处理后的最终奖励。
-    """
-    # 0. 已获得宝箱的奖励
-    processed_reward = collected_treasures_count * Config.REWARD_TREASURE_BONUS
-
-    # 1. 最终奖励处理 (如果回合结束，对原始奖励进行缩放)
-    if is_terminal:
-        processed_reward += raw_reward * Config.REWARD_SCALE_TERMINAL
-        return [processed_reward]
-
-    # 2. 时间惩罚和低效行动惩罚
-    processed_reward -= visit_count * Config.REPEAT_VISIT_PENALTY  # 访问次数越多，惩罚越大
-    if is_bad_action:
-        processed_reward -= Config.REWARD_BAD_ACTION_PENALTY
-
-    # 动态调整时间惩罚的权重，随着步数增加，时间惩罚逐渐增大
-    time_penalty_factor = (current_steps / Config.MAX_STEP_NO) ** 2  # 指数增长
-    
-    target_is_treasure =  Config.REWARD_SCALE_END_DIST * time_penalty_factor / 128 > Config.REWARD_SCALE_TREASURE_DIST
-
-    # 3. 闪现奖励：只有当智能体使用了闪现时才计算
-    if is_flash_used:
-        # 闪现的奖励也需要考虑动态权重
-        if nearest_treasure_pos is not None and end_pos is not None:
-            # 计算到宝箱和终点的距离变化
-            dist_change_treasure = calculate_distance(prev_pos, nearest_treasure_pos) - calculate_distance(agent_pos, nearest_treasure_pos)
-            dist_change_end = calculate_distance(prev_pos, end_pos) - calculate_distance(agent_pos, end_pos)
-
-            # 闪现奖励是两个目标中的一个
-            if target_is_treasure:
-                if dist_change_treasure > 0:  # 如果距离宝箱变近
-                    processed_reward += Config.REWARD_GOOD_FLASH * cross_obstacles  # 闪现穿越障碍物的奖励
-                processed_reward += dist_change_treasure * Config.REWARD_SCALE_FLASH_DIST
-            else:
-                if dist_change_end > 0:  # 如果距离终点变近
-                    processed_reward += Config.REWARD_GOOD_FLASH * cross_obstacles  # 闪现穿越障碍物的奖励
-                processed_reward += dist_change_end * Config.REWARD_SCALE_FLASH_DIST
-            
-    # 4. 普通移动奖励：当没有使用闪现时才计算
-    else:
-        if nearest_treasure_pos is not None and target_is_treasure:
-            if prev_dist_to_treasure is not None:
-                distance_change_treasure = prev_dist_to_treasure - current_dist_to_treasure
-                processed_reward += distance_change_treasure * Config.REWARD_SCALE_TREASURE_DIST
-        
-        elif end_pos is not None and not target_is_treasure:
-            current_dist_to_end = calculate_distance(agent_pos, end_pos)
-            processed_reward -= current_dist_to_end / 128 * Config.REWARD_SCALE_END_DIST * time_penalty_factor
-    
-    return [processed_reward]
 
 @attached
 def sample_process(list_game_data):
-    return [SampleData(**i.__dict__) for i in list_game_data]
+    pass
 
 
+# SampleData <----> NumpyData
 @attached
 def SampleData2NumpyData(g_data):
-    # 确保所有数据都是一维数组，方便 hstack 拼接
-    obs_arr = np.array(g_data.obs, dtype=np.float32).flatten()
-    _obs_arr = np.array(g_data._obs, dtype=np.float32).flatten()
-    obs_legal_arr = np.array(g_data.obs_legal, dtype=np.float32).flatten() # 16维
-    _obs_legal_arr = np.array(g_data._obs_legal, dtype=np.float32).flatten() # 16维
-    act_arr = np.array([g_data.act], dtype=np.float32) # 确保是 [act] 变成 (1,)
-    rew_arr = np.array([g_data.rew], dtype=np.float32) # 变成 (1,)
-    ret_arr = np.array([g_data.ret], dtype=np.float32) # 变成 (1,)
-    done_arr = np.array([g_data.done], dtype=np.float32) # 变成 (1,)
+    pass
 
-    return np.hstack(
-        (
-            obs_arr,
-            _obs_arr,
-            obs_legal_arr,
-            _obs_legal_arr,
-            act_arr,
-            rew_arr,
-            ret_arr,
-            done_arr,
-        )
-    )
 
 @attached
 def NumpyData2SampleData(s_data):
-    obs_data_size = Config.DIM_OF_OBSERVATION
-    total_action_space_size = Config.TOTAL_ACTION_SPACE
-    # obs 和 _obs 部分的长度
-    current_idx = 0
-    obs_end_idx = current_idx + obs_data_size
-    obs = s_data[current_idx : obs_end_idx]
-    current_idx = obs_end_idx
-
-    _obs_end_idx = current_idx + obs_data_size
-    _obs = s_data[current_idx : _obs_end_idx]
-    current_idx = _obs_end_idx
-
-    # obs_legal 部分的长度 - 应该使用 total_action_space_size (16)
-    obs_legal_end_idx = current_idx + total_action_space_size
-    obs_legal = s_data[current_idx : obs_legal_end_idx]
-    current_idx = obs_legal_end_idx
-
-    # _obs_legal 部分的长度 - 应该使用 total_action_space_size (16)
-    _obs_legal_end_idx = current_idx + total_action_space_size
-    _obs_legal = s_data[current_idx : _obs_legal_end_idx]
-    current_idx = _obs_legal_end_idx
-
-    act = s_data[current_idx]
-    rew = s_data[current_idx + 1]
-    ret = s_data[current_idx + 2]
-    done = s_data[current_idx + 3]
-
-    act = s_data[-4]
-    rew = s_data[-3]
-    ret = s_data[-2]
-    done = s_data[-1]
-
-
-    return SampleData(
-        obs=obs,
-        _obs=_obs,
-        obs_legal=obs_legal,
-        _obs_legal=_obs_legal,
-        act=act,
-        rew=rew,
-        ret=ret,
-        done=done,
-    )
+    pass

@@ -33,7 +33,7 @@ class Algorithm:
         self.device = device
         self.model = Model(
             state_shape=self.obs_shape,
-            action_shape=self.act_shape + self.talent_direction,
+            action_shape=self.act_shape,
             softmax=False,
         )
         self.model.to(self.device)

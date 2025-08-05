@@ -11,7 +11,7 @@ Author: Tencent AI Arena Authors
 import time
 import os
 from kaiwu_agent.utils.common_func import Frame, attached
-from agent_target_dqn.feature.definition import ReplayBuffer
+
 from tools.train_env_conf_validate import read_usr_conf
 from agent_target_dqn.feature.definition import (
     sample_process,
@@ -27,7 +27,6 @@ def workflow(envs, agents, logger=None, monitor=None):
         last_save_model_time = 0
         last_put_data_time = 0
         monitor_data = {}
-        replaybuffer = ReplayBuffer(10000)
 
         # Read and validate configuration file
         # 配置文件读取和校验
@@ -138,7 +137,7 @@ def run_episodes(n_episode, env, agent, usr_conf, logger, monitor):
                     )
                 elif terminated:
                     win_rate = agent.update_win_rate(True)
-                    reward = 100
+                    reward = 10
                     logger.info(
                         f"Game terminated! step_no:{step_no} score:{game_info['total_score']} win_rate:{win_rate}"
                     )

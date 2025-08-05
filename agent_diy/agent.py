@@ -10,6 +10,7 @@ Author: Tencent AI Arena Authors
 
 import torch
 import numpy as np
+from agent_diy.conf.conf import Config
 from kaiwu_agent.agent.base_agent import (
     BaseAgent,
     predict_wrapper,
@@ -31,12 +32,16 @@ from arena_proto.back_to_the_realm_v2.custom_pb2 import (
 @attached
 class Agent(BaseAgent):
     def __init__(self, agent_type="player", device=None, logger=None, monitor=None):
+        super().__init__(agent_type, device, logger, monitor)
         self.agent_type = agent_type
         self.logger = logger
         self.algorithm = Algorithm(device, logger, monitor)
         self.preprocessor = Preprocessor()
         self.last_action = -1
         self.win_history = []
+        if Config.LOAD_MODEL_ID:
+            logger.info(f"Loading model with ID: {Config.LOAD_MODEL_ID}")
+            self._load_model(path="/data/projects/back_to_the_realm_v2/ckpt/", id=str(Config.LOAD_MODEL_ID))
 
     def update_win_rate(self, is_win):
         self.win_history.append(is_win)
@@ -85,6 +90,18 @@ class Agent(BaseAgent):
         model_file_path = f"{path}/model.ckpt-{str(id)}.pkl"
         self.algorithm.model.load_state_dict(torch.load(model_file_path, map_location=self.algorithm.device))
         self.logger.info(f"load model {model_file_path} successfully")
+
+    def _load_model(self, path=None, id="1"):
+        model_file_path = f"{path}/model.ckpt-{str(id)}.pkl"
+        try:
+            checkpoint = torch.load(model_file_path, map_location=self.algorithm.device)
+            self.algorithm.model.load_state_dict(checkpoint)
+            self.algorithm.target_model.load_state_dict(self.algorithm.model.state_dict())
+            self.logger.info(f"load model {model_file_path} successfully")
+        except FileNotFoundError:
+            self.logger.error(f"Model file {model_file_path} not found.")
+        except Exception as e:
+            self.logger.error(f"Error loading model from {model_file_path}: {str(e)}")
 
     def observation_process(self, obs, extra_info, truncated=False):
         (feature_vec, legal_action, reward_list) = self.preprocessor.process([obs, extra_info], self.last_action, truncated)

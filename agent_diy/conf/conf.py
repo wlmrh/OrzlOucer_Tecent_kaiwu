@@ -12,6 +12,7 @@ Author: Tencent AI Arena Authors
 # The last few configurations in the file are for the Kaiwu platform to use and should not be changed.
 # 配置，包含维度设置，算法参数设置，文件的最后一些配置是开悟平台使用不要改动
 class Config:
+    LOAD_MODEL_ID = 14048
     ACTION_LEN = 1 # 保持不变，代表一个动作的长度（例如，一个整数索引）
     ACTION_NUM = 16 # 保持不变，总动作数量 8 移动 + 8 闪现
 

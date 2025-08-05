@@ -166,14 +166,6 @@ class Preprocessor:
         #     self.end_pos_norm = None
         #     self.current_dist_to_end = float("inf")
 
-        if self.nearest_treasure_pos == self.agent_pos: # 已经获得当前宝箱，变量初始化
-            self.treasures_got.append(self.nearest_treasure_no)
-            self.nearest_treasure_no = None
-            self.nearest_treasure_pos = None
-            self.nearest_treasure_pos_norm = None
-            self.current_dist_to_treasure = float("inf")
-            self.is_getting_treasure = True
-
         nearest_treasure_no = None
         nearest_treasure_pos = None
         current_dist_to_treasure = float("inf")
@@ -206,33 +198,39 @@ class Preprocessor:
                 self.current_dist_to_end = abs(self.end_pos[0] - self.agent_pos[0]) + abs(self.end_pos[1] - self.agent_pos[1])
                 continue
             
-            # 只看宝箱
+            # 不是宝箱直接跳过
             if organ["sub_type"] != 1:
                 continue
 
             # 更新旧宝箱的信息
             if self.nearest_treasure_no is not None:
                 if organ["config_id"] == self.nearest_treasure_no: # 如果是之前记录的最近宝箱
-                    if organ["status"] != -1: # 在视野内，使用精确坐标
+                    if organ["status"] == 0: # 获取了宝箱
+                        self.treasures_got.append(self.nearest_treasure_no)
+                        self.nearest_treasure_no = None
+                        self.nearest_treasure_pos = None
+                        self.nearest_treasure_pos_norm = None
+                        self.current_dist_to_treasure = float("inf")
+                        self.is_getting_treasure = True
+                    elif organ["status"] == 1: # 在视野内，使用精确坐标
                         self.nearest_treasure_pos = (organ["pos"]["x"], organ["pos"]["z"])
                         self.nearest_treasure_pos_norm = norm(self.nearest_treasure_pos, self.map_size, 0)
-                    elif self.current_steps % 10 == 0: # 不在视野内，每10步更新一次估算位置
+                        self.current_dist_to_treasure = abs(self.nearest_treasure_pos[0] - self.agent_pos[0]) + abs(self.nearest_treasure_pos[1] - self.agent_pos[1])
+                    elif self.current_steps % 10 == 1: # 不在视野内，每10步更新一次估算位置
                         estimated_loc = (
                             max(0, min(self.map_size -1, round(self.agent_pos[0] + delta_x))), # 确保在地图范围内
                             max(0, min(self.map_size -1, round(self.agent_pos[1] + delta_z))),
                         )
                         self.nearest_treasure_pos = estimated_loc
                         self.nearest_treasure_pos_norm = norm(estimated_loc, self.map_size, 0)
-                    self.current_dist_to_treasure = abs(self.nearest_treasure_pos[0] - self.agent_pos[0]) + abs(self.nearest_treasure_pos[1] - self.agent_pos[1])
-                continue
+                        self.current_dist_to_treasure = abs(self.nearest_treasure_pos[0] - self.agent_pos[0]) + abs(self.nearest_treasure_pos[1] - self.agent_pos[1])
 
             # 发现新的宝箱
-            if self.nearest_treasure_no == None and organ["config_id"] not in self.treasures_got: # 如果是未被收集的宝箱
-                # 宝箱非空
+            if organ["config_id"] not in self.treasures_got: # 如果是未被收集的宝箱
                 loc = (organ["pos"]["x"], organ["pos"]["z"])
                 distance_to_current_organ = abs(loc[0] - self.agent_pos[0]) + abs(loc[1] - self.agent_pos[1])
-                
-                if organ["status"] != -1: # 在视野内，使用精确坐标
+
+                if organ["status"] == 1: # 在视野内，使用精确坐标
                     if distance_to_current_organ < current_dist_to_treasure:
                         nearest_treasure_pos = loc
                         nearest_treasure_no = organ["config_id"]
@@ -249,7 +247,7 @@ class Preprocessor:
                         nearest_treasure_no = organ["config_id"]
                         current_dist_to_treasure = distance_to_estimated_organ
         
-        if nearest_treasure_no is not None:
+        if self.nearest_treasure_no is None:
             self.nearest_treasure_no = nearest_treasure_no
             self.nearest_treasure_pos = nearest_treasure_pos
             self.nearest_treasure_pos_norm = norm(nearest_treasure_pos, self.map_size, 0)

@@ -107,25 +107,34 @@ def reward_process(raw_reward, collected_treasures_count , agent_pos, prev_pos,
         list [float]: 经过塑形处理后的最终奖励。
     """
     # 0. 已获得宝箱的奖励
-    processed_reward = collected_treasures_count * Config.REWARD_TREASURE_BONUS
-
+    # processed_reward = collected_treasures_count * Config.REWARD_TREASURE_BONUS
+    processed_reward = 0
+    if is_getting_treasure:
+        processed_reward += Config.REWARD_TREASURE_BONUS
     # 1. 最终奖励处理 (如果回合结束，对原始奖励进行缩放)
-    if is_terminal:
-        processed_reward += raw_reward * Config.REWARD_SCALE_TERMINAL
-        return [processed_reward]
+    # if is_terminal:
+    #     processed_reward += raw_reward * Config.REWARD_SCALE_TERMINAL
+    #     return [processed_reward]
 
     # 2. 时间惩罚和低效行动惩罚
-    processed_reward -= visit_count * Config.REPEAT_VISIT_PENALTY  # 访问次数越多，惩罚越大
+    processed_reward -= Config.REWARD_TIME_PENALTY  # 每一步的时间惩罚
+    
+    index = 0
+    if visit_count > 1:
+        index = 0.3 + Config.REPEAT_VISIT_PENALTY * (visit_count - 1)  # 访问次数越多，惩罚越大
+        processed_reward -= index # 访问次数越多，惩罚越大
+
     if is_bad_action:
         processed_reward -= Config.REWARD_BAD_ACTION_PENALTY
 
     # 动态调整时间惩罚的权重，随着步数增加，时间惩罚逐渐增大
-    time_penalty_factor = (current_steps / Config.MAX_STEP_NO) ** 2  # 指数增长
+    # time_penalty_factor = (current_steps / Config.MAX_STEP_NO) ** 2  # 指数增长
     
-    target_is_treasure =  Config.REWARD_SCALE_END_DIST * time_penalty_factor / 128 > Config.REWARD_SCALE_TREASURE_DIST
-
+    # target_is_treasure =  Config.REWARD_SCALE_END_DIST * time_penalty_factor / 128 > Config.REWARD_SCALE_TREASURE_DIST
+    target_is_treasure = True
     # 3. 闪现奖励：只有当智能体使用了闪现时才计算
     if is_flash_used:
+        processed_reward -= Config.REWARD_PENALTY_FLASH
         # 闪现的奖励也需要考虑动态权重
         if nearest_treasure_pos is not None and end_pos is not None:
             # 计算到宝箱和终点的距离变化
@@ -136,11 +145,11 @@ def reward_process(raw_reward, collected_treasures_count , agent_pos, prev_pos,
             if target_is_treasure:
                 if dist_change_treasure > 0:  # 如果距离宝箱变近
                     processed_reward += Config.REWARD_GOOD_FLASH * cross_obstacles  # 闪现穿越障碍物的奖励
-                processed_reward += dist_change_treasure * Config.REWARD_SCALE_FLASH_DIST
-            else:
-                if dist_change_end > 0:  # 如果距离终点变近
-                    processed_reward += Config.REWARD_GOOD_FLASH * cross_obstacles  # 闪现穿越障碍物的奖励
-                processed_reward += dist_change_end * Config.REWARD_SCALE_FLASH_DIST
+                processed_reward += dist_change_treasure * Config.REWARD_SCALE_TREASURE_DIST
+            # else:
+            #     if dist_change_end > 0:  # 如果距离终点变近
+            #         processed_reward += Config.REWARD_GOOD_FLASH * cross_obstacles  # 闪现穿越障碍物的奖励
+            #     processed_reward += dist_change_end * Config.REWARD_SCALE_FLASH_DIST
             
     # 4. 普通移动奖励：当没有使用闪现时才计算
     else:
@@ -149,9 +158,9 @@ def reward_process(raw_reward, collected_treasures_count , agent_pos, prev_pos,
                 distance_change_treasure = prev_dist_to_treasure - current_dist_to_treasure
                 processed_reward += distance_change_treasure * Config.REWARD_SCALE_TREASURE_DIST
         
-        elif end_pos is not None and not target_is_treasure:
-            current_dist_to_end = calculate_distance(agent_pos, end_pos)
-            processed_reward -= current_dist_to_end / 128 * Config.REWARD_SCALE_END_DIST * time_penalty_factor
+        # elif end_pos is not None and not target_is_treasure:
+        #     current_dist_to_end = calculate_distance(agent_pos, end_pos)
+        #     processed_reward -= current_dist_to_end / 128 * Config.REWARD_SCALE_END_DIST * time_penalty_factor
     
     return [processed_reward]
 

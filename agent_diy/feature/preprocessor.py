@@ -54,6 +54,7 @@ class Preprocessor:
         self.cross_obstacles = 0 # 闪现穿越的障碍物数量
 
         self.nearest_treasure_pos = None # 最近宝箱坐标
+        self.nearest_treasure_no = None # 最近宝箱编号
         self.nearest_treasure_pos_norm = None # 归一化最近宝箱坐标
         self.current_dist_to_treasure = float("inf") # 最近宝箱距离
         self.prev_dist_to_treasure = float("inf") # 上一帧到最近宝箱的距离
@@ -134,13 +135,14 @@ class Preprocessor:
         self.prev_pos = self.agent_pos
         self.prev_dist_to_treasure = self.current_dist_to_treasure
         self.prev_dist_to_end = self.current_dist_to_end
-
+        self.last_action = last_action
         if last_action > 7: # 如果是闪现
             self.cross_obstacles = self.count_obstacles(
                 self.vision[1], 
                 (5, 5), # 起点坐标通常是 (5, 5)
                 self.flash_direct[last_action - 8] # last_action - 8 是闪现的方向
             )
+        
 
         # 计算本帧的信息
         hero = obs["frame_state"]["heroes"][0]
@@ -155,15 +157,26 @@ class Preprocessor:
             self.can_flash = True
         
         # 重置最近宝箱距离，以便重新发现
-        self.current_dist_to_treasure = float("inf")
+        # self.current_dist_to_treasure = float("inf")
         self.is_getting_treasure = False
 
-        # 终点坐标的处理，如果视野中没有，则使用默认的未找到值
-        if not self.is_end_pos_precise:
-            self.end_pos = None
-            self.end_pos_norm = None
-            self.current_dist_to_end = float("inf")
+        # # 终点坐标的处理，如果视野中没有，则使用默认的未找到值
+        # if not self.is_end_pos_precise:
+        #     self.end_pos = None
+        #     self.end_pos_norm = None
+        #     self.current_dist_to_end = float("inf")
 
+        if self.nearest_treasure_pos == self.agent_pos: # 已经获得当前宝箱，变量初始化
+            self.treasures_got.append(self.nearest_treasure_no)
+            self.nearest_treasure_no = None
+            self.nearest_treasure_pos = None
+            self.nearest_treasure_pos_norm = None
+            self.current_dist_to_treasure = float("inf")
+            self.is_getting_treasure = True
+
+        nearest_treasure_no = None
+        nearest_treasure_pos = None
+        current_dist_to_treasure = float("inf")
         for organ in obs["frame_state"]["organs"]:
             pos_dis = RelativeDistance[organ["relative_pos"]["l2_distance"]]
             pos_dir = RelativeDirection[organ["relative_pos"]["direction"]]
@@ -171,52 +184,77 @@ class Preprocessor:
 
             if organ["sub_type"] == 4: # 如果是终点
                 if self.is_end_pos_precise: # 曾经看到过终点的位置
-                    self.current_dist_to_end = math.hypot(self.end_pos[0] - self.agent_pos[0], self.end_pos[1] - self.agent_pos[1])
+                    self.current_dist_to_end = abs(self.end_pos[0] - self.agent_pos[0]) + abs(self.end_pos[1] - self.agent_pos[1])
                     continue
 
                 if organ["status"] != -1: # 0表示不可获取，1表示可获取, -1表示视野外
                     self.end_pos = (organ["pos"]["x"], organ["pos"]["z"])
                     self.end_pos_norm = norm(self.end_pos, self.map_size, 0) # 确保归一化
-                    self.current_dist_to_end = math.hypot(self.end_pos[0] - self.agent_pos[0], self.end_pos[1] - self.agent_pos[1])
                     self.is_end_pos_precise = True
+                    self.current_dist_to_end = abs(self.end_pos[0] - self.agent_pos[0]) + abs(self.end_pos[1] - self.agent_pos[1])
+                    continue
+                
                 # if end_pos is not found, use relative position to predict end_pos
                 # 如果终点坐标未找到，使用相对坐标预测终点坐标
-                elif (not self.is_end_pos_precise): # 终点一直在视野外
+                if self.current_steps % 10 == 0 or self.current_steps == 1: # 终点一直在视野外，每10步更新一次估算位置
                     self.end_pos = (
                         max(0, min(self.map_size -1, round(self.agent_pos[0] + delta_x))), # 确保在地图范围内
                         max(0, min(self.map_size -1, round(self.agent_pos[1] + delta_z))),
                     )
                     self.end_pos_norm = norm(self.end_pos, self.map_size, 0) # 确保归一化
-                    self.current_dist_to_end = math.hypot(self.end_pos[0] - self.agent_pos[0], self.end_pos[1] - self.agent_pos[1])
-            
-            elif organ["sub_type"] == 1: # 如果是宝箱
-                if organ["status"] == 0: # 已被获取（空宝箱）
-                    if organ["config_id"] not in self.treasures_got:
-                        self.treasures_got.append(organ["config_id"])
-                        self.is_getting_treasure = True
-                    continue
                 
+                self.current_dist_to_end = abs(self.end_pos[0] - self.agent_pos[0]) + abs(self.end_pos[1] - self.agent_pos[1])
+                continue
+            
+            # 只看宝箱
+            if organ["sub_type"] != 1:
+                continue
+
+            # 更新旧宝箱的信息
+            if self.nearest_treasure_no is not None:
+                if organ["config_id"] == self.nearest_treasure_no: # 如果是之前记录的最近宝箱
+                    if organ["status"] != -1: # 在视野内，使用精确坐标
+                        self.nearest_treasure_pos = (organ["pos"]["x"], organ["pos"]["z"])
+                        self.nearest_treasure_pos_norm = norm(self.nearest_treasure_pos, self.map_size, 0)
+                    elif self.current_steps % 10 == 0: # 不在视野内，每10步更新一次估算位置
+                        estimated_loc = (
+                            max(0, min(self.map_size -1, round(self.agent_pos[0] + delta_x))), # 确保在地图范围内
+                            max(0, min(self.map_size -1, round(self.agent_pos[1] + delta_z))),
+                        )
+                        self.nearest_treasure_pos = estimated_loc
+                        self.nearest_treasure_pos_norm = norm(estimated_loc, self.map_size, 0)
+                    self.current_dist_to_treasure = abs(self.nearest_treasure_pos[0] - self.agent_pos[0]) + abs(self.nearest_treasure_pos[1] - self.agent_pos[1])
+                continue
+
+            # 发现新的宝箱
+            if self.nearest_treasure_no == None and organ["config_id"] not in self.treasures_got: # 如果是未被收集的宝箱
                 # 宝箱非空
                 loc = (organ["pos"]["x"], organ["pos"]["z"])
-                distance_to_current_organ = math.hypot(loc[0] - self.agent_pos[0], loc[1] - self.agent_pos[1])
+                distance_to_current_organ = abs(loc[0] - self.agent_pos[0]) + abs(loc[1] - self.agent_pos[1])
                 
                 if organ["status"] != -1: # 在视野内，使用精确坐标
-                    if distance_to_current_organ < self.current_dist_to_treasure:
-                        self.nearest_treasure_pos = loc
-                        self.nearest_treasure_pos_norm = norm(loc, self.map_size, 0) # 确保归一化
-                        self.current_dist_to_treasure = distance_to_current_organ
+                    if distance_to_current_organ < current_dist_to_treasure:
+                        nearest_treasure_pos = loc
+                        nearest_treasure_no = organ["config_id"]
+                        current_dist_to_treasure = distance_to_current_organ
                 else: # 不在视野内则估算距离
                     estimated_loc = (
                         max(0, min(self.map_size -1, round(self.agent_pos[0] + delta_x))), # 确保在地图范围内
                         max(0, min(self.map_size -1, round(self.agent_pos[1] + delta_z))),
                     )
-                    distance_to_estimated_organ = math.hypot(estimated_loc[0] - self.agent_pos[0], estimated_loc[1] - self.agent_pos[1])
+                    distance_to_estimated_organ = abs(estimated_loc[0] - self.agent_pos[0]) + abs(estimated_loc[1] - self.agent_pos[1])
 
-                    if distance_to_estimated_organ < self.current_dist_to_treasure:
-                        self.nearest_treasure_pos = estimated_loc
-                        self.nearest_treasure_pos_norm = norm(estimated_loc, self.map_size, 0) # 确保归一化
-                        self.current_dist_to_treasure = distance_to_estimated_organ
+                    if distance_to_estimated_organ < current_dist_to_treasure:
+                        nearest_treasure_pos = estimated_loc
+                        nearest_treasure_no = organ["config_id"]
+                        current_dist_to_treasure = distance_to_estimated_organ
         
+        if nearest_treasure_no is not None:
+            self.nearest_treasure_no = nearest_treasure_no
+            self.nearest_treasure_pos = nearest_treasure_pos
+            self.nearest_treasure_pos_norm = norm(nearest_treasure_pos, self.map_size, 0)
+            self.current_dist_to_treasure = abs(self.nearest_treasure_pos[0] - self.agent_pos[0]) + abs(self.nearest_treasure_pos[1] - self.agent_pos[1])
+
         # 更新视野 (vision)
         # 清空所有通道以填充新数据
         for i in range(5):
@@ -240,8 +278,6 @@ class Preprocessor:
                     else: # 加速增益坐标 (假设 value == 6 或其他值)
                         self.vision[4][r, c] = 1.0 # 加速增益通道
                         self.vision[0][r, c] = 1.0 # 正常道路通道
-
-        self.last_action = last_action
 
     def process(self, frame_state, last_action, truncated):
         self.pb2struct(frame_state, last_action) # 更新 Preprocessor 类的各项属性

@@ -96,7 +96,7 @@ class Config:
 
     # 2. 核心奖励信号
     # 每收集一个宝箱，给予的额外奖励。这个奖励是持续的，每一步都会得到
-    REWARD_TREASURE_BONUS = 0.2
+    REWARD_TREASURE_BONUS = 0.5
     # 靠近宝箱的距离奖励，应该略高于终点奖励，以鼓励前期探索
     REWARD_SCALE_TREASURE_DIST = 0.05
     # 靠近终点的距离奖励，会乘上一个小于1的权重
@@ -108,16 +108,12 @@ class Config:
     # 乱用闪现的惩罚要大，让模型学会谨慎使用
     REWARD_PENALTY_BAD_FLASH = 0.5
     # 闪现穿越每个障碍物的奖励
-    REWARD_GOOD_FLASH = 0.08
+    REWARD_GOOD_FLASH = 0.05
+    # 闪现有效长度奖励
+    REWARD_FLASH_DISTANCE = 0.01
     # 每一步的时间惩罚，用于鼓励智能体快速行动，不要在原地徘徊
-    REWARD_TIME_PENALTY = 0.05
+    # REWARD_TIME_PENALTY = 0.05
     # 低效行动的惩罚，鼓励智能体采取更有效的行动
     REWARD_BAD_ACTION_PENALTY = 0.05
     # 访问次数惩罚，鼓励智能体探索新区域
     REPEAT_VISIT_PENALTY = 0.05
-    
-    # 内存池相关参数
-    REPLAY_BUFFER_SIZE = 30000     # 内存池最大容量
-    REPLAY_BUFFER_MIN_SIZE = 300   # 内存池开始学习的最小容量 (例如 BATCH_SIZE * 10)
-    BATCH_SIZE = 32                 # 每次从内存池采样的数据量
-    TRAIN_ITERATIONS_PER_EPISODE = 5 # 每个回合结束后，从内存池学习的次数

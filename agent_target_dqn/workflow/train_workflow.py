@@ -131,13 +131,11 @@ def run_episodes(n_episode, env, agent, usr_conf, logger, monitor):
                 game_info = _extra_info["game_info"]
                 if truncated:
                     win_rate = agent.update_win_rate(False)
-                    reward = -3
                     logger.info(
                         f"Game truncated! step_no:{step_no} score:{game_info['total_score']} win_rate:{win_rate}"
                     )
                 elif terminated:
                     win_rate = agent.update_win_rate(True)
-                    reward = 10
                     logger.info(
                         f"Game terminated! step_no:{step_no} score:{game_info['total_score']} win_rate:{win_rate}"
                     )

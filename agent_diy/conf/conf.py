@@ -13,6 +13,7 @@ Author: Tencent AI Arena Authors
 # 配置，包含维度设置，算法参数设置，文件的最后一些配置是开悟平台使用不要改动
 class Config:
     LOAD_MODEL_ID = 14048
+    TRAIN_STEPS = 2000000
     ACTION_LEN = 1 # 保持不变，代表一个动作的长度（例如，一个整数索引）
     ACTION_NUM = 16 # 保持不变，总动作数量 8 移动 + 8 闪现
 
@@ -83,12 +84,12 @@ class Config:
     # epsilon
     EPSILON_MIN = 0.1
     EPSILON_MAX = 1.0
-    EPSILON_DECAY = 1e-7
+    EPSILON_DECAY = 1e-6
 
     # Initial learning rate
     # 初始的学习率
     START_LR = 1e-4
-    LR_DECAY_RATE = 0.00001
+    LR_DECAY_RATE = 1e-8
 
     # --- 奖励函数相关系数 ---
     # 1. 最终奖励与失败惩罚
@@ -99,7 +100,7 @@ class Config:
     # 每收集一个宝箱，给予的额外奖励。这个奖励是持续的，每一步都会得到
     REWARD_TREASURE_BONUS = 5
     # 靠近宝箱的距离奖励，应该略高于终点奖励，以鼓励前期探索
-    REWARD_SCALE_TREASURE_DIST = 0.05
+    REWARD_SCALE_TREASURE_DIST = 0.07
     # 靠近终点的距离奖励，会乘上一个小于1的权重
     REWARD_SCALE_END_DIST = 1
 
@@ -109,7 +110,7 @@ class Config:
     # 乱用闪现的惩罚要大，让模型学会谨慎使用
     REWARD_PENALTY_BAD_FLASH = 0.5
     # 闪现穿越每个障碍物的奖励
-    REWARD_GOOD_FLASH = 0.01
+    REWARD_GOOD_FLASH = 0.03
     # 闪现有效长度奖励
     REWARD_FLASH_DISTANCE = 0.01
     # 每一步的时间惩罚，用于鼓励智能体快速行动，不要在原地徘徊

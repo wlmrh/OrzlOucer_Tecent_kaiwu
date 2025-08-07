@@ -1,4 +1,4 @@
-# 环境配置
+ # 环境配置
 [env_conf]
 # 地图名称不可修改，请使用默认名称。
 map_name='map_cherry'

@@ -39,10 +39,12 @@ class Agent(BaseAgent):
         self.preprocessor = Preprocessor()
         self.last_action = -1
         self.win_history = []
-        if Config.LOAD_MODEL_ID:
+        if Config.LOAD_MODEL_ID is not None:
             logger.info(f"Loading model with ID: {Config.LOAD_MODEL_ID}")
             self._load_model(path="/data/projects/back_to_the_realm_v2/ckpt/", id=str(Config.LOAD_MODEL_ID))
-
+        if Config.TRAIN_STEPS is not None:
+            self.algorithm.train_step = Config.TRAIN_STEPS
+            
     def update_win_rate(self, is_win):
         self.win_history.append(is_win)
         if len(self.win_history) > 100:

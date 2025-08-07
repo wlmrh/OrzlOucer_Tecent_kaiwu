@@ -247,12 +247,17 @@ class Preprocessor:
                         nearest_treasure_no = organ["config_id"]
                         current_dist_to_treasure = distance_to_estimated_organ
         
-        if self.nearest_treasure_no is None:
-            self.nearest_treasure_no = nearest_treasure_no
-            self.nearest_treasure_pos = nearest_treasure_pos
-            self.nearest_treasure_pos_norm = norm(nearest_treasure_pos, self.map_size, 0)
-            self.current_dist_to_treasure = abs(self.nearest_treasure_pos[0] - self.agent_pos[0]) + abs(self.nearest_treasure_pos[1] - self.agent_pos[1])
-
+        if self.nearest_treasure_no is None: # 已经获得了旧宝箱
+            if nearest_treasure_no is not None: # 发现了新的宝箱
+                self.nearest_treasure_no = nearest_treasure_no
+                self.nearest_treasure_pos = nearest_treasure_pos
+                self.nearest_treasure_pos_norm = norm(nearest_treasure_pos, self.map_size, 0)
+                self.current_dist_to_treasure = abs(self.nearest_treasure_pos[0] - self.agent_pos[0]) + abs(self.nearest_treasure_pos[1] - self.agent_pos[1])
+            else:
+                self.nearest_treasure_no = None
+                self.nearest_treasure_pos = self.agent_pos
+                self.nearest_treasure_pos_norm = self.agent_pos_norm
+                self.current_dist_to_treasure = 0
         # 更新视野 (vision)
         # 清空所有通道以填充新数据
         for i in range(5):
